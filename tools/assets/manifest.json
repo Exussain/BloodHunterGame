@@ -1,0 +1,70 @@
+{
+  "_comment": "Everything the generator makes. Characters: image -> Meshy image-to-3D -> Meshy rigging. Props: image -> Meshy image-to-3D. Textures: image only. All people are fictional; never describe a real, identifiable person. Uniforms use invented insignia only.",
+  "style": {
+    "character_sheet": "single full-body character, standing in A-pose, arms 30 degrees from body, facing camera, orthographic front view, entire body visible from head to feet, plain flat light-grey background, soft even studio lighting, no shadows on the ground, photorealistic, game-ready concept for 3D reconstruction",
+    "prop_sheet": "single isolated object, three-quarter view from slightly above, entire object visible, plain flat light-grey background, soft even studio lighting, photorealistic, game-ready concept for 3D reconstruction",
+    "texture": "seamless tileable PBR albedo texture, perfectly flat orthographic top-down or straight-on view, even diffuse lighting, no perspective, no shadows, no objects in front, photorealistic, 4k detail"
+  },
+  "characters": [
+    {
+      "id": "volatile",
+      "height_m": 2.0,
+      "prompt": {
+        "subject": "gaunt infected predator creature that was once a tall Iranian man, grey-veined pale skin, elongated limbs and clawed fingers, glowing amber eyes, torn blood-soaked red tracksuit and red hoodie",
+        "mood": "feral, menacing, 18+ horror game protagonist",
+        "identity": "fictional, not resembling any real person"
+      }
+    },
+    {
+      "id": "militia_rifleman",
+      "height_m": 1.78,
+      "prompt": {
+        "subject": "Iranian militia soldier, about 30, short dark beard, olive-green military uniform inspired by Iranian Revolutionary Guard style with invented shoulder patch, tactical vest, black boots, holding an AK-style rifle",
+        "identity": "fictional, not resembling any real person, no real emblems or logos"
+      }
+    },
+    {
+      "id": "militia_officer",
+      "height_m": 1.8,
+      "prompt": {
+        "subject": "Iranian militia officer, about 45, grey-streaked beard, darker olive uniform with invented rank insignia, beret, sidearm holster, radio on chest",
+        "identity": "fictional, not resembling any real person, no real emblems or logos"
+      }
+    },
+    {
+      "id": "militia_plainclothes",
+      "height_m": 1.76,
+      "prompt": {
+        "subject": "Iranian plainclothes militia fighter, about 25, black jacket over white shirt, dark trousers, green armband, holding a baton and pistol",
+        "identity": "fictional, not resembling any real person, no real emblems or logos"
+      }
+    },
+    {
+      "id": "militia_heavy",
+      "height_m": 1.85,
+      "prompt": {
+        "subject": "heavyset Iranian militia machine gunner, about 35, thick beard, olive camouflage uniform with invented patch, heavy body armor, helmet, belt-fed machine gun",
+        "identity": "fictional, not resembling any real person, no real emblems or logos"
+      }
+    }
+  ],
+  "props": [
+    { "id": "pickup_armed", "prompt": "white Iranian Nissan Zamyad pickup truck with a mounted heavy machine gun on the bed, dirty and dented" },
+    { "id": "paykan", "prompt": "old white Iranian Paykan sedan car, worn paint, Tehran street car" },
+    { "id": "sandbag_wall", "prompt": "low curved wall of stacked military sandbags, about 3 meters long" },
+    { "id": "streetlight", "prompt": "tall Tehran sodium streetlight pole with single curved arm and orange lamp head" },
+    { "id": "water_tank", "prompt": "rooftop cylindrical metal water tank on a small steel stand, rusty, typical Tehran apartment roof" },
+    { "id": "ac_unit", "prompt": "rooftop evaporative air cooler unit (koolere abi), boxy grey metal, Tehran apartment" },
+    { "id": "barrier", "prompt": "red and white striped metal police checkpoint barrier" },
+    { "id": "pool_fountain", "prompt": "small rectangular stone fountain pool with low turquoise-tiled rim, Persian style, empty of people" }
+  ],
+  "textures": [
+    { "id": "facade_brick", "prompt": "Tehran apartment building facade of light yellow-tan brick in Persian bond pattern, straight-on" },
+    { "id": "facade_stone", "prompt": "Tehran apartment facade of pale travertine stone slabs, straight-on" },
+    { "id": "facade_concrete", "prompt": "weathered grey concrete apartment wall with water stains, straight-on" },
+    { "id": "asphalt_wet", "prompt": "dark wet city asphalt road surface with small puddles and fine cracks, top-down" },
+    { "id": "sidewalk_tiles", "prompt": "Tehran sidewalk of grey and red square concrete paving tiles, worn, top-down" },
+    { "id": "pool_tiles", "prompt": "turquoise Persian ceramic pool tiles with thin white grout, top-down" },
+    { "id": "station_wall", "prompt": "police station wall of white-painted plaster over concrete, dirty, bullet marks, straight-on" }
+  ]
+}

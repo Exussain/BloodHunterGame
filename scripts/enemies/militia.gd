@@ -12,12 +12,15 @@ enum State { PATROL, ALERT, DOWNED, FED_ON, DEAD }
 @export var hit_chance := 0.35
 @export var shot_damage := 7.0
 @export var patrol_points: Array[Vector3] = []
+## Which generated character to use (see tools/assets/manifest.json).
+@export var variant := "militia_rifleman"
 
 var state: State = State.PATROL
 var health := max_health
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _model: Node3D
+var _anim: AnimationPlayer
 var _muzzle_light: OmniLight3D
 var _patrol_index := 0
 var _fire_timer := 0.0
@@ -40,6 +43,20 @@ func _ready() -> void:
 func _build_model() -> void:
 	_model = Node3D.new()
 	add_child(_model)
+	var generated := GeneratedAssets.character(variant)
+	if generated:
+		_model.add_child(generated)
+		_anim = GeneratedAssets.find_animation_player(generated)
+	else:
+		_build_placeholder()
+	_muzzle_light = OmniLight3D.new()
+	_muzzle_light.light_color = Color(1.0, 0.75, 0.35)
+	_muzzle_light.light_energy = 0.0
+	_muzzle_light.omni_range = 6.0
+	_muzzle_light.position = Vector3(0.22, 1.25, -0.85)
+	_model.add_child(_muzzle_light)
+
+func _build_placeholder() -> void:
 	# Placeholder look: olive Sipah-style uniform (invented insignia only).
 	var uniform := StandardMaterial3D.new()
 	uniform.albedo_color = Color(0.22, 0.25, 0.16)
@@ -58,12 +75,6 @@ func _build_model() -> void:
 	var rifle := BoxMesh.new()
 	rifle.size = Vector3(0.08, 0.1, 0.9)
 	_part(rifle, gun, Vector3(0.22, 1.25, -0.35), Vector3.ONE)
-	_muzzle_light = OmniLight3D.new()
-	_muzzle_light.light_color = Color(1.0, 0.75, 0.35)
-	_muzzle_light.light_energy = 0.0
-	_muzzle_light.omni_range = 6.0
-	_muzzle_light.position = Vector3(0.22, 1.25, -0.85)
-	_model.add_child(_muzzle_light)
 
 func _part(mesh: Mesh, mat: Material, pos: Vector3, scl: Vector3) -> void:
 	var mi := MeshInstance3D.new()
@@ -156,6 +167,7 @@ func _physics_process(delta: float) -> void:
 			velocity.x = 0
 			velocity.z = 0
 	move_and_slide()
+	GeneratedAssets.drive_locomotion(_anim, Vector2(velocity.x, velocity.z).length(), walk_speed * 3.0)
 	_muzzle_light.light_energy = maxf(_muzzle_light.light_energy - delta * 40.0, 0.0)
 
 func _patrol() -> void:

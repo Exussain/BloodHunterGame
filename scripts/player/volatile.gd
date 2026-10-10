@@ -43,6 +43,7 @@ var _yaw: Node3D
 var _pitch: Node3D
 var _camera: Camera3D
 var _model: Node3D
+var _anim: AnimationPlayer
 var _wall_ray: RayCast3D
 var _ledge_ray: RayCast3D
 var _left_ray: RayCast3D
@@ -82,6 +83,11 @@ func _build_body() -> void:
 	# Placeholder: a figure in a red human outfit, until rigged models arrive.
 	_model = Node3D.new()
 	add_child(_model)
+	var generated := GeneratedAssets.character("volatile")
+	if generated:
+		_model.add_child(generated)
+		_anim = GeneratedAssets.find_animation_player(generated)
+		return
 	var red := StandardMaterial3D.new()
 	red.albedo_color = Color(0.55, 0.02, 0.02)
 	red.roughness = 0.6
@@ -174,6 +180,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_update_model_facing(delta)
+	GeneratedAssets.drive_locomotion(_anim, Vector2(velocity.x, velocity.z).length(), sprint_speed)
 
 	if state in [State.GROUND, State.AIR]:
 		state = State.GROUND if is_on_floor() else State.AIR

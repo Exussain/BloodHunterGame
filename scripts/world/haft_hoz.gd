@@ -28,7 +28,11 @@ func _ready() -> void:
 func _mat(key: String) -> StandardMaterial3D:
 	if _mats.has(key):
 		return _mats[key]
-	var m := StandardMaterial3D.new()
+	var m := _generated_mat(key)
+	if m:
+		_mats[key] = m
+		return m
+	m = StandardMaterial3D.new()
 	match key:
 		"asphalt":
 			# Wet asphalt: dark and glossy so SSR picks up the streetlights.
@@ -78,6 +82,39 @@ func _mat(key: String) -> StandardMaterial3D:
 			m.roughness = 0.85
 	_mats[key] = m
 	return m
+
+## Generated textures (tools/assets) override the flat greybox colours.
+const TEXTURED := {
+	"asphalt": ["asphalt_wet", 0.15, 6.0],
+	"sidewalk": ["sidewalk_tiles", 0.6, 2.0],
+	"pool_edge": ["pool_tiles", 0.35, 1.0],
+	"station": ["station_wall", 0.85, 4.0],
+	"block0": ["facade_brick", 0.85, 6.0],
+	"block1": ["facade_stone", 0.75, 6.0],
+	"block2": ["facade_concrete", 0.9, 6.0],
+	"block3": ["facade_brick", 0.85, 6.0],
+}
+
+func _generated_mat(key: String) -> StandardMaterial3D:
+	if not TEXTURED.has(key):
+		return null
+	var spec: Array = TEXTURED[key]
+	var m := GeneratedAssets.texture_material(spec[0], spec[1], spec[2])
+	if m and key == "asphalt":
+		m.metallic_specular = 0.7
+	return m
+
+## Swaps a greybox's mesh for a generated prop scaled to fill it, keeping its collision.
+func _dress(box: MeshInstance3D, prop_id: String, fit_size := Vector3.ZERO) -> void:
+	var prop := GeneratedAssets.prop(prop_id)
+	if prop == null:
+		return
+	var size: Vector3 = fit_size if fit_size != Vector3.ZERO else (box.mesh as BoxMesh).size
+	box.add_child(prop)
+	GeneratedAssets.fit_prop(prop, size)
+	if fit_size != Vector3.ZERO:
+		prop.position.y += (fit_size.y - (box.mesh as BoxMesh).size.y) * 0.5
+	box.mesh = null
 
 func _box(size: Vector3, pos: Vector3, mat: Material, collide := true) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -192,7 +229,8 @@ func _build_blocks() -> void:
 			_box(Vector3(width, h, depth), Vector3(x, h * 0.5, z + depth * 0.5), _mat("block%d" % _rng.randi_range(0, 3)))
 			_add_windows(x - side * width * 0.5, z, depth, floors, side)
 			# Rooftop clutter for the predator to perch on: water tanks and AC units.
-			_box(Vector3(2.2, 1.6, 2.2), Vector3(x + _rng.randf_range(-4, 4), h + 0.8, z + depth * 0.5), _mat("metal"))
+			var roof := _box(Vector3(2.2, 1.6, 2.2), Vector3(x + _rng.randf_range(-4, 4), h + 0.8, z + depth * 0.5), _mat("metal"))
+			_dress(roof, "water_tank" if _rng.randf() < 0.5 else "ac_unit")
 			z += depth + gap
 
 func _add_windows(face_x: float, z0: float, depth: float, floors: int, side: int) -> void:
@@ -220,8 +258,9 @@ func _build_station() -> void:
 	add_child(sign_light)
 	# Militia checkpoint: sandbag walls and an armed pickup.
 	for x in [-8.0, -4.0, 4.0, 8.0]:
-		_box(Vector3(3.5, 1.1, 1.0), Vector3(x, 0.55, z + 20), _mat("sandbag"))
-	_box(Vector3(2.0, 1.4, 4.8), Vector3(10, 0.9, z + 26), _mat("truck"))
+		_dress(_box(Vector3(3.5, 1.1, 1.0), Vector3(x, 0.55, z + 20), _mat("sandbag")), "sandbag_wall")
+	_dress(_box(Vector3(2.0, 1.4, 4.8), Vector3(10, 0.9, z + 26), _mat("truck")), "pickup_armed", Vector3(2.0, 2.4, 4.8))
+	_dress(_box(Vector3(5.0, 1.0, 0.2), Vector3(0, 0.5, z + 30), _mat("curb"), false), "barrier")
 	_box(Vector3(0.15, 0.15, 1.6), Vector3(10, 2.1, z + 25), _mat("metal"), false)
 	var flood := SpotLight3D.new()
 	flood.light_color = Color(1.0, 0.95, 0.85)
@@ -239,7 +278,7 @@ func _build_streetlights() -> void:
 	for z in range(-80, 80, 16):
 		for side: int in [-1, 1]:
 			var x: float = side * 15.6
-			_box(Vector3(0.18, 7.5, 0.18), Vector3(x, 3.75, z), _mat("metal"))
+			_dress(_box(Vector3(0.18, 7.5, 0.18), Vector3(x, 3.75, z), _mat("metal")), "streetlight", Vector3(2.0, 7.8, 2.0))
 			_box(Vector3(1.6, 0.12, 0.3), Vector3(x - side * 0.7, 7.5, z), _mat("metal"), false)
 			var lamp := OmniLight3D.new()
 			lamp.light_color = SODIUM
@@ -279,8 +318,12 @@ func _spawn_militia() -> void:
 		[Vector3(8, 0.2, 40), Vector3(8, 0.2, 70)],
 		[Vector3(0, 0.2, -95), Vector3(0, 0.2, -95)],
 	]
-	for route in routes:
+	# Officer at the checkpoint, a heavy gunner at the door, the rest mixed.
+	var variants := ["militia_officer", "militia_rifleman", "militia_plainclothes", "militia_rifleman", "militia_plainclothes", "militia_heavy"]
+	for i in routes.size():
+		var route: Array = routes[i]
 		var m := Militia.new()
+		m.variant = variants[i]
 		m.patrol_points.assign(route)
 		m.position = route[0]
 		add_child(m)

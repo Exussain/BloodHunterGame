@@ -19,6 +19,28 @@ Controls: WASD move, Shift sprint, Space jump, left click claw, hold right click
 - Haft Hoz greybox: the seven pools, climbable apartment blocks, the militia-held کلانتری with a checkpoint.
 - Placeholder militia that patrol, spot you and shoot.
 
+## Real assets (ChatGPT image + Meshy)
+
+`tools/assets/generate.py` turns the JSON prompts in `tools/assets/manifest.json` into game assets:
+
+- **Characters** (volatile + 4 militia types): image API concept sheet, Meshy image-to-3D, Meshy auto-rig with walk/run clips, saved to `assets/characters/<id>/`.
+- **Props** (armed pickup, Paykan, sandbags, streetlights, rooftop tanks and coolers, barrier): image, Meshy image-to-3D, saved to `assets/props/<id>/`.
+- **Textures** (brick, stone and concrete facades, wet asphalt, sidewalk, pool tiles, station wall): image only, saved to `assets/textures/`.
+
+The game swaps each greybox for its generated asset automatically when the file exists. Nothing else to wire up.
+
+```
+export IMAGE_API_KEY=...          # OpenAI-compatible key (or OPENAI_API_KEY)
+export IMAGE_API_BASE=https://ai.nubixshop.ir/v1   # default
+export IMAGE_MODEL=gpt-image-1    # default
+export MESHY_API_KEY=...
+python3 tools/assets/generate.py --dry-run     # see every prompt first
+python3 tools/assets/generate.py --kind textures
+python3 tools/assets/generate.py               # everything still missing
+```
+
+Then open the project in Godot so it imports the new files.
+
 ## Tests
 
 ```
