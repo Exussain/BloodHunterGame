@@ -1,0 +1,28 @@
+keys,fa,en
+AGE_TITLE,هشدار,Warning
+AGE_BODY,این بازی شامل خشونت شدید و صحنه‌های خونین است. فقط برای بزرگسالان ۱۸+. مناسب کودکان نیست.,Extreme violence and gore. Adults 18+ only. Not suitable for children.
+AGE_CONFIRM,۱۸ سال یا بیشتر دارم,I am 18 or older
+AGE_EXIT,خروج,Exit
+GAME_TITLE,شکارچی خون,Blood Hunter
+MENU_START,شروع شکار,Start the hunt
+MENU_GRAPHICS,کیفیت گرافیک,Graphics quality
+MENU_SUBS_EN,زیرنویس انگلیسی,English subtitles
+MENU_QUIT,خروج,Quit
+Q_ULTRA,اولترا,Ultra
+Q_HIGH,بالا,High
+Q_MEDIUM,متوسط,Medium
+Q_LOW,پایین,Low
+HUD_HEALTH,سلامت,Health
+HUD_MUTATION,جهش,Mutation
+HUD_POUNCE,جهش حمله,Pounce
+HUD_FEED_HINT,[E] تغذیه,[E] Feed
+HUD_CONTROLS,"حرکت: WASD | دویدن: Shift | پرش: Space | چنگ: کلیک چپ | جهش حمله: نگه‌داشتن کلیک راست | بالا رفتن: به سمت دیوار حرکت کن","Move: WASD | Sprint: Shift | Jump: Space | Claw: Left click | Pounce: hold Right click | Climb: move into a wall"
+UNLOCK_TENDRIL,قدرت جدید: چنگک,New power: Tendril grab
+UNLOCK_SCREAM,قدرت جدید: جیغ,New power: Scream
+UNLOCK_RAGE,قدرت جدید: خشم,New power: Rage form
+PAUSE_TITLE,توقف,Paused
+PAUSE_RESUME,ادامه,Resume
+PAUSE_MENU,منوی اصلی,Main menu
+STATION_SIGN,کلانتری هفت حوض,Haft Hoz Police Station
+SQUARE_SIGN,میدان هفت حوض,Haft Hoz Square
+DEATH_TEXT,سپیده دم رسید. عقب‌نشینی کن.,Dawn has come. Retreat.

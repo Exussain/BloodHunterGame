@@ -1,0 +1,64 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Blood Hunter"
+config/description="شکارچی خون: بازی اکشن ۱۸+ در تهران"
+run/main_scene="res://scenes/ui/age_gate.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+
+[autoload]
+
+Settings="*res://scripts/autoload/settings.gd"
+Graphics="*res://scripts/autoload/graphics.gd"
+InputSetup="*res://scripts/autoload/input_setup.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=2
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom="res://assets/ui/theme.tres"
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://localization/strings.fa.translation", "res://localization/strings.en.translation")
+locale/fallback="fa"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+anti_aliasing/quality/use_taa=true
+anti_aliasing/quality/screen_space_aa=0
+scaling_3d/mode=2
+scaling_3d/scale=0.77
+lights_and_shadows/directional_shadow/size=8192
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=5
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=5
+lights_and_shadows/positional_shadow/atlas_size=8192
+environment/ssao/quality=4
+environment/ssil/quality=4
+environment/screen_space_reflection/roughness_quality=3
+environment/volumetric_fog/volume_size=128
+environment/volumetric_fog/volume_depth=128
+global_illumination/sdfgi/probe_ray_count=5
+global_illumination/sdfgi/frames_to_converge=2
+textures/default_filters/anisotropic_filtering_level=4
