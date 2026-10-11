@@ -229,22 +229,72 @@ func _build_pools() -> void:
 		sign_label.rotation_degrees.y = facing
 		add_child(sign_label)
 
+## Generated apartment blocks and the real height (m) each is scaled to.
+const BUILDINGS := {"apt_brick_5": 21.0, "apt_stone_6": 24.0, "apt_old_3": 12.5, "apt_concrete_8": 31.0}
+## Turn (degrees) that brings each model's front to +Z; Meshy keeps the concept's 3/4 view.
+const BUILDING_FRONT_YAW := {}
+
 func _build_blocks() -> void:
+	var ids: Array[String] = []
+	for id: String in BUILDINGS:
+		if ResourceLoader.exists(GeneratedAssets.BUILDING_DIR % id + "model.glb"):
+			ids.append(id)
 	for side: int in [-1, 1]:
 		var z := -85.0
+		var last := ""
 		while z < 75.0:
+			var gap := _rng.randf_range(2.5, 5.0)
+			if not ids.is_empty():
+				# Never the same block twice in a row.
+				var id := ids[_rng.randi() % ids.size()]
+				if id == last and ids.size() > 1:
+					id = ids[(ids.find(id) + 1) % ids.size()]
+				last = id
+				z += _place_building(id, BUILDINGS[id], side, z) + gap
+				continue
 			var depth := _rng.randf_range(12.0, 20.0)
 			var width := _rng.randf_range(14.0, 22.0)
 			var floors := _rng.randi_range(3, 8)
 			var h := floors * 3.2
 			var x: float = side * (20.0 + width * 0.5)
-			var gap := _rng.randf_range(2.5, 5.0)
 			_box(Vector3(width, h, depth), Vector3(x, h * 0.5, z + depth * 0.5), _mat("block%d" % _rng.randi_range(0, 3)))
 			_add_windows(x - side * width * 0.5, z, depth, floors, side)
 			# Rooftop clutter for the predator to perch on: water tanks and AC units.
 			var roof := _box(Vector3(2.2, 1.6, 2.2), Vector3(x + _rng.randf_range(-4, 4), h + 0.8, z + depth * 0.5), _mat("metal"))
 			_dress(roof, "water_tank" if _rng.randf() < 0.5 else "ac_unit")
 			z += depth + gap
+
+## Stands a generated building on its lot with its front on the sidewalk at x = side * 20,
+## starting at z0, under one box collider the player can climb. Returns its length along the street.
+func _place_building(id: String, height: float, side: int, z0: float) -> float:
+	var pivot := _building_pivot(id, -90.0 * side, height)
+	var aabb := GeneratedAssets._bounds(pivot, Transform3D.IDENTITY)
+	var street_edge := aabb.position.x if side > 0 else aabb.end.x
+	pivot.position = Vector3(side * 20.0 - street_edge, -aabb.position.y, z0 - aabb.position.z)
+	_building_collider(aabb, pivot.position)
+	return aabb.size.z
+
+## The model under a pivot turned to face `yaw_deg` and scaled to `height`.
+func _building_pivot(id: String, yaw_deg: float, height: float) -> Node3D:
+	var model := GeneratedAssets.building(id)
+	model.rotation_degrees.y = BUILDING_FRONT_YAW.get(id, 0.0)
+	var pivot := Node3D.new()
+	pivot.add_child(model)
+	pivot.rotation_degrees.y = yaw_deg
+	add_child(pivot)
+	var raw := GeneratedAssets._bounds(pivot, Transform3D.IDENTITY)
+	pivot.scale = Vector3.ONE * (height / raw.size.y)
+	return pivot
+
+func _building_collider(aabb: AABB, offset: Vector3) -> void:
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = aabb.size
+	shape.shape = box
+	body.add_child(shape)
+	body.position = aabb.get_center() + offset
+	add_child(body)
 
 func _add_windows(face_x: float, z0: float, depth: float, floors: int, side: int) -> void:
 	for f in floors:
@@ -266,13 +316,25 @@ func _build_parked_cars() -> void:
 				_dress(car, "paykan", Vector3.ZERO, 90.0)
 			z += _rng.randf_range(6.0, 11.0)
 
+const STATION_HEIGHT := 12.0
+const STATION_SIGN_HEIGHT := 7.2
+
 func _build_station() -> void:
 	# The captured کلانتری closes the north end of the boulevard.
 	var z := -110.0
-	_box(Vector3(34, 9, 18), Vector3(0, 4.5, z), _mat("station"))
-	_box(Vector3(10, 4, 1), Vector3(0, 2, z + 9.4), _mat("metal"))
+	var sign_pos := Vector3(0, 7.2, z + 9.2)
+	if ResourceLoader.exists(GeneratedAssets.BUILDING_DIR % "police_station" + "model.glb"):
+		# The compound faces the boulevard, its front wall on the old box's front at z + 9.
+		var pivot := _building_pivot("police_station", 0.0, STATION_HEIGHT)
+		var aabb := GeneratedAssets._bounds(pivot, Transform3D.IDENTITY)
+		pivot.position = Vector3(-aabb.get_center().x, -aabb.position.y, z + 9.0 - aabb.end.z)
+		_building_collider(aabb, pivot.position)
+		sign_pos = Vector3(0, STATION_SIGN_HEIGHT, z + 9.0 + 0.3)
+	else:
+		_box(Vector3(34, 9, 18), Vector3(0, 4.5, z), _mat("station"))
+		_box(Vector3(10, 4, 1), Vector3(0, 2, z + 9.4), _mat("metal"))
 	var sign_label := _persian_label(tr("STATION_SIGN"), 160, Color(0.85, 0.92, 1.0))
-	sign_label.position = Vector3(0, 7.2, z + 9.2)
+	sign_label.position = sign_pos
 	add_child(sign_label)
 	var sign_light := OmniLight3D.new()
 	sign_light.light_color = Color(0.7, 0.85, 1.0)

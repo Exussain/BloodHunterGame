@@ -30,7 +30,7 @@ func _run() -> void:
 	root.add_child(cam)
 	cam.make_current()
 
-	for kind in ["props", "characters"]:
+	for kind in ["props", "characters", "buildings"]:
 		var dir := DirAccess.open("res://assets/" + kind)
 		if dir == null:
 			continue
@@ -38,7 +38,7 @@ func _run() -> void:
 			var path := "res://assets/%s/%s/model.glb" % [kind, id]
 			if not ResourceLoader.exists(path):
 				continue
-			var node: Node3D = load(path).instantiate()
+			var node: Node3D = GeneratedAssets.building(id) if kind == "buildings" else load(path).instantiate()
 			root.add_child(node)
 			var aabb := GeneratedAssets._bounds(node, Transform3D.IDENTITY)
 			var c := aabb.get_center()
@@ -48,12 +48,17 @@ func _run() -> void:
 				c = Vector3(0, 0.9, 0)
 				r = 1.0
 			# glTF faces +Z, so look from +Z and a little to the side.
-			cam.position = c + Vector3(0.5, 0.25, 1.0).normalized() * r * 1.7
-			cam.look_at(c)
-			for i in 4:
-				await process_frame
-			await RenderingServer.frame_post_draw
-			root.get_texture().get_image().save_png(out.path_join("%s_%s.png" % [kind, id]))
+			# Buildings get all four sides, to check which way the front faces.
+			var views := [0.0, 90.0, 180.0, 270.0] if kind == "buildings" else [0.0]
+			for yaw: float in views:
+				var dir := Vector3(0.5, 0.25, 1.0).normalized().rotated(Vector3.UP, deg_to_rad(yaw))
+				cam.position = c + dir * r * 1.7
+				cam.look_at(c)
+				for i in 4:
+					await process_frame
+				await RenderingServer.frame_post_draw
+				var suffix := "" if views.size() == 1 else "_%03d" % int(yaw)
+				root.get_texture().get_image().save_png(out.path_join("%s_%s%s.png" % [kind, id, suffix]))
 			print("preview ", kind, "/", id, " size=", aabb.size)
 			node.queue_free()
 			await process_frame

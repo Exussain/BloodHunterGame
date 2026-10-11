@@ -356,7 +356,10 @@ def glb_base_color(path):
     doc = json.loads(data[20:20 + json_len])
     binary = data[20 + json_len + 8:]
     tex = doc["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
-    view = doc["bufferViews"][doc["images"][doc["textures"][tex]["source"]]["bufferView"]]
+    texture = doc["textures"][tex]
+    # gltf-transform's WebP output moves the image index into EXT_texture_webp.
+    source = texture.get("source", texture.get("extensions", {}).get("EXT_texture_webp", {}).get("source"))
+    view = doc["bufferViews"][doc["images"][source]["bufferView"]]
     start = view.get("byteOffset", 0)
     return Image.open(io.BytesIO(binary[start:start + view["byteLength"]])).convert("RGB")
 
