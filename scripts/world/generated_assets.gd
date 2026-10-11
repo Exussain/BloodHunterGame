@@ -156,31 +156,33 @@ static func texture_material(id: String, roughness: float, tile_m: float) -> Sta
 	return m
 
 const BUILDING_DIR := "res://assets/buildings/%s/"
+const WINDOW_GLOW := preload("res://assets/shaders/spatial_env_window_glow.gdshader")
 
-## A generated building, with the lit windows baked into its texture made to glow.
-## windows.png (from generate.py) keeps only those window pixels; everything else is black.
-static func building(id: String, window_energy := 2.5) -> Node3D:
+## A generated building whose window panes (windows.png, from generate.py) light up
+## at random at night, through an additive pass over the model's own material.
+static func building(id: String, lit_fraction := 0.35) -> Node3D:
 	var path := BUILDING_DIR % id + "model.glb"
 	if not ResourceLoader.exists(path):
 		return null
 	var model: Node3D = load(path).instantiate()
-	var glow_path := BUILDING_DIR % id + "windows.png"
-	if ResourceLoader.exists(glow_path):
-		_add_window_glow(model, load(glow_path), window_energy)
+	var mask_path := BUILDING_DIR % id + "windows.png"
+	if ResourceLoader.exists(mask_path):
+		var glow := ShaderMaterial.new()
+		glow.shader = WINDOW_GLOW
+		glow.set_shader_parameter(&"glass_mask", load(mask_path))
+		glow.set_shader_parameter(&"lit_fraction", lit_fraction)
+		_add_next_pass(model, glow)
 	return model
 
-static func _add_window_glow(node: Node, glow: Texture2D, energy: float) -> void:
+static func _add_next_pass(node: Node, pass_material: Material) -> void:
 	if node is MeshInstance3D:
 		var mi := node as MeshInstance3D
 		for s in mi.mesh.get_surface_count():
-			var base := mi.get_active_material(s) as BaseMaterial3D
+			var base := mi.get_active_material(s)
 			if base == null:
 				continue
-			var m := base.duplicate() as BaseMaterial3D
-			m.emission_enabled = true
-			m.emission = Color.WHITE
-			m.emission_texture = glow
-			m.emission_energy_multiplier = energy
+			var m := base.duplicate() as Material
+			m.next_pass = pass_material
 			mi.set_surface_override_material(s, m)
 	for child in node.get_children():
-		_add_window_glow(child, glow, energy)
+		_add_next_pass(child, pass_material)

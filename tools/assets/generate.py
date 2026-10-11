@@ -365,25 +365,23 @@ def glb_base_color(path):
 
 
 def make_window_emission(glb, dest):
-    """Meshy bakes the concept's lit windows into the base colour. Keeps only those
-    pixels (bright, warm or cold-white, brighter than the wall around them) so the
-    game can make them glow at night; everything else is black."""
+    """Finds the window glass in a building's base colour: dark, unsaturated or bluish
+    panes, plus any warm lights Meshy kept from the concept. Saves it as a greyscale
+    mask; the game's window shader lights a random share of it at night."""
     import numpy as np
     from PIL import Image, ImageFilter
     img = glb_base_color(glb)
     rgb = np.asarray(img, dtype=np.float32) / 255.0
     value = rgb.max(axis=2)
     sat = (value - rgb.min(axis=2)) / np.maximum(value, 1e-4)
-    local = np.asarray(img.convert("L").filter(ImageFilter.BoxBlur(12)), dtype=np.float32) / 255.0
-    luma = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
-    warm = (rgb[..., 0] >= rgb[..., 2]) & (sat > 0.25)
-    mask = np.clip((value - 0.62) / 0.2, 0, 1) * np.clip((luma - local - 0.04) / 0.12, 0, 1)
-    mask *= np.where(warm, 1.0, 0.6)
-    mask = np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))
-                      .filter(ImageFilter.GaussianBlur(1)), dtype=np.float32) / 255.0
-    out = (rgb * mask[..., None] * 255).astype(np.uint8)
-    Image.fromarray(out).save(dest, optimize=True)
-    log(f"    window glow -> {dest.relative_to(ROOT)} ({mask.mean() * 100:.1f}% lit)")
+    dark = (value < 0.32) & (sat < 0.45)
+    bluish = (rgb[..., 2] > rgb[..., 0] + 0.04) & (value < 0.55)
+    warm_lit = (value > 0.8) & (sat > 0.3) & (rgb[..., 0] > rgb[..., 2])
+    mask = Image.fromarray(((dark | bluish | warm_lit) * 255).astype(np.uint8))
+    # An opening drops thin dark lines (railings, cracks, seams) and keeps the panes.
+    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    mask.save(dest, optimize=True)
+    log(f"    window mask -> {dest.relative_to(ROOT)} ({np.asarray(mask).mean() / 2.55:.1f}% glass)")
 
 
 def _period(signal):
