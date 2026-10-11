@@ -278,26 +278,38 @@ def library_names():
     return _library
 
 
-def do_prop(p, style, state, args):
-    out = ROOT / "assets/props" / p["id"]
-    key = f"prop:{p['id']}"
+def do_model(kind, sheet, p, style, state, args):
+    """Props and buildings: concept image -> image-to-3D, saved to assets/<kind>/<id>/model.glb."""
+    out = ROOT / "assets" / kind / p["id"]
+    key = f"{kind[:-1]}:{p['id']}"
     if args.force:
         forget(state, key)
     if (out / "model.glb").exists() and not args.force and args.stage == "all":
-        log(f"skip prop {p['id']} (exists)")
+        log(f"skip {kind[:-1]} {p['id']} (exists)")
         return
-    prompt = json_prompt(style["prop_sheet"], p["prompt"])
+    prompt = json_prompt(style[sheet], p["prompt"])
     if args.dry_run:
-        log(f"prop {p['id']}\n  {prompt}")
+        log(f"{kind[:-1]} {p['id']}\n  {prompt}")
         return
-    log(f"prop {p['id']}")
-    concept = CONCEPTS / f"props_{p['id']}.png"
+    log(f"{kind[:-1]} {p['id']}")
+    concept = CONCEPTS / f"{kind}_{p['id']}.png"
     img_id = make_image(state, key, prompt, concept, "1:1")
     if args.stage == "image":
         return
-    _, task = image_to_3d(state, key, img_id, concept, p.get("polycount", 20000))
+    _, task = image_to_3d(state, key, img_id, concept, p.get("polycount", 20000 if kind == "props" else 50000))
     download(task["model_urls"]["glb"], out / "model.glb")
-    optimize_glb(out / "model.glb")
+    # Buildings fill the screen, so they keep the full 2K texture.
+    optimize_glb(out / "model.glb", 2048 if kind == "buildings" else 1024)
+    if kind == "buildings":
+        make_window_emission(out / "model.glb", out / "windows.png")
+
+
+def do_prop(p, style, state, args):
+    do_model("props", "prop_sheet", p, style, state, args)
+
+
+def do_building(p, style, state, args):
+    do_model("buildings", "building_sheet", p, style, state, args)
 
 
 def do_texture(t, style, state, args):
@@ -317,8 +329,8 @@ def do_texture(t, style, state, args):
     make_seamless(dest)
 
 
-def optimize_glb(path):
-    """Shrinks a Meshy GLB about 8x (1K WebP textures, pruned data) with gltf-transform,
+def optimize_glb(path, texture_size=1024):
+    """Shrinks a Meshy GLB about 8x (WebP textures, 1K by default, pruned data) with gltf-transform,
     keeping plain geometry so Godot imports it without extensions it lacks."""
     import shutil
     import subprocess
@@ -327,11 +339,48 @@ def optimize_glb(path):
         return
     tmp = path.with_suffix(".opt.glb")
     subprocess.run(["gltf-transform", "optimize", str(path), str(tmp), "--compress", "false",
-                    "--texture-compress", "webp", "--texture-size", "1024", "--simplify", "false",
+                    "--texture-compress", "webp", "--texture-size", str(texture_size), "--simplify", "false",
                     "--instance", "false", "--flatten", "false", "--join", "false"],
                    check=True, capture_output=True)
     tmp.replace(path)
     log(f"    optimized {path.relative_to(ROOT)} ({path.stat().st_size // 1024} KB)")
+
+
+def glb_base_color(path):
+    """The first material's base colour image from a GLB, as a Pillow image."""
+    import io
+    import struct
+    from PIL import Image
+    data = path.read_bytes()
+    json_len = struct.unpack_from("<I", data, 12)[0]
+    doc = json.loads(data[20:20 + json_len])
+    binary = data[20 + json_len + 8:]
+    tex = doc["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"]["index"]
+    view = doc["bufferViews"][doc["images"][doc["textures"][tex]["source"]]["bufferView"]]
+    start = view.get("byteOffset", 0)
+    return Image.open(io.BytesIO(binary[start:start + view["byteLength"]])).convert("RGB")
+
+
+def make_window_emission(glb, dest):
+    """Meshy bakes the concept's lit windows into the base colour. Keeps only those
+    pixels (bright, warm or cold-white, brighter than the wall around them) so the
+    game can make them glow at night; everything else is black."""
+    import numpy as np
+    from PIL import Image, ImageFilter
+    img = glb_base_color(glb)
+    rgb = np.asarray(img, dtype=np.float32) / 255.0
+    value = rgb.max(axis=2)
+    sat = (value - rgb.min(axis=2)) / np.maximum(value, 1e-4)
+    local = np.asarray(img.convert("L").filter(ImageFilter.BoxBlur(12)), dtype=np.float32) / 255.0
+    luma = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    warm = (rgb[..., 0] >= rgb[..., 2]) & (sat > 0.25)
+    mask = np.clip((value - 0.62) / 0.2, 0, 1) * np.clip((luma - local - 0.04) / 0.12, 0, 1)
+    mask *= np.where(warm, 1.0, 0.6)
+    mask = np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))
+                      .filter(ImageFilter.GaussianBlur(1)), dtype=np.float32) / 255.0
+    out = (rgb * mask[..., None] * 255).astype(np.uint8)
+    Image.fromarray(out).save(dest, optimize=True)
+    log(f"    window glow -> {dest.relative_to(ROOT)} ({mask.mean() * 100:.1f}% lit)")
 
 
 def _period(signal):
@@ -386,7 +435,7 @@ def make_seamless(path, raw_dir=HERE / "raw"):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--kind", choices=["characters", "props", "textures"])
+    ap.add_argument("--kind", choices=["characters", "props", "buildings", "textures"])
     ap.add_argument("--only", help="comma-separated ids to generate")
     ap.add_argument("--force", action="store_true", help="regenerate from scratch even if files exist")
     ap.add_argument("--stage", choices=["image", "all"], default="all", help="'image' stops after concept images")
@@ -397,7 +446,7 @@ def main():
     manifest = json.loads((HERE / "manifest.json").read_text())
     style = manifest["style"]
     args.action_sets = {k: v for k, v in manifest.get("action_sets", {}).items() if not k.startswith("_")}
-    kinds = [args.kind] if args.kind else ["textures", "characters", "props"]
+    kinds = [args.kind] if args.kind else ["textures", "characters", "props", "buildings"]
     only = set(args.only.split(",")) if args.only else None
 
     if not args.dry_run:
@@ -407,7 +456,7 @@ def main():
             sys.exit("IMAGE_API_KEY (or OPENAI_API_KEY) is not set")
 
     state = load_state()
-    steps = {"characters": do_character, "props": do_prop, "textures": do_texture}
+    steps = {"characters": do_character, "props": do_prop, "buildings": do_building, "textures": do_texture}
     jobs = [(steps[kind], item) for kind in kinds for item in manifest[kind]
             if only is None or item["id"] in only]
 

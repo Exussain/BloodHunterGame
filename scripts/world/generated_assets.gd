@@ -154,3 +154,33 @@ static func texture_material(id: String, roughness: float, tile_m: float) -> Sta
 	m.uv1_scale = Vector3.ONE / tile_m
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	return m
+
+const BUILDING_DIR := "res://assets/buildings/%s/"
+
+## A generated building, with the lit windows baked into its texture made to glow.
+## windows.png (from generate.py) keeps only those window pixels; everything else is black.
+static func building(id: String, window_energy := 2.5) -> Node3D:
+	var path := BUILDING_DIR % id + "model.glb"
+	if not ResourceLoader.exists(path):
+		return null
+	var model: Node3D = load(path).instantiate()
+	var glow_path := BUILDING_DIR % id + "windows.png"
+	if ResourceLoader.exists(glow_path):
+		_add_window_glow(model, load(glow_path), window_energy)
+	return model
+
+static func _add_window_glow(node: Node, glow: Texture2D, energy: float) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		for s in mi.mesh.get_surface_count():
+			var base := mi.get_active_material(s) as BaseMaterial3D
+			if base == null:
+				continue
+			var m := base.duplicate() as BaseMaterial3D
+			m.emission_enabled = true
+			m.emission = Color.WHITE
+			m.emission_texture = glow
+			m.emission_energy_multiplier = energy
+			mi.set_surface_override_material(s, m)
+	for child in node.get_children():
+		_add_window_glow(child, glow, energy)

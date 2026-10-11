@@ -3,7 +3,8 @@
   "style": {
     "character_sheet": "single full-body character, standing in A-pose, arms 30 degrees from body, facing camera, orthographic front view, entire body visible from head to feet, plain flat light-grey background, soft even studio lighting, no shadows on the ground, photorealistic, game-ready concept for 3D reconstruction",
     "prop_sheet": "single isolated object, three-quarter view from slightly above, entire object visible, plain flat light-grey background, soft even studio lighting, photorealistic, game-ready concept for 3D reconstruction",
-    "texture": "seamless tileable PBR albedo texture, perfectly flat orthographic top-down or straight-on view, even diffuse lighting, no perspective, no shadows, no objects in front, photorealistic, 4k detail, no text, no logos, no windows or doors"
+    "texture": "seamless tileable PBR albedo texture, perfectly flat orthographic top-down or straight-on view, even diffuse lighting, no perspective, no shadows, no objects in front, photorealistic, 4k detail, no text, no logos, no windows or doors",
+    "building_sheet": "entire single building isolated, front three-quarter view from street level slightly raised, whole building visible from ground to roof, plain flat light-grey background, at dusk with soft even ambient light on the facade, warm yellow interior lights glowing in about half of the windows, photorealistic, game-ready concept for 3D reconstruction, no people, no cars, no text, no signs, no logos"
   },
   "characters": [
     {
@@ -139,5 +140,33 @@
       "down": 183,
       "death": 189
     }
-  }
+  },
+  "buildings": [
+    {
+      "id": "apt_brick_5",
+      "floors": 5,
+      "prompt": "typical Tehran 5-storey apartment building, yellow-tan brick facade, white stone window frames, small balconies with black metal railings, ground floor shops with rolled-down metal shutters, evaporative coolers on the flat roof"
+    },
+    {
+      "id": "apt_stone_6",
+      "floors": 6,
+      "prompt": "modern Tehran 6-storey apartment building, pale travertine stone facade, tall windows with dark frames, glass balcony railings, flat roof with water tanks"
+    },
+    {
+      "id": "apt_old_3",
+      "floors": 3,
+      "prompt": "older Tehran 3-storey brick house from the 1970s, arched windows, wrought-iron balcony railings, satellite dishes on the roof, worn plaster patches"
+    },
+    {
+      "id": "apt_concrete_8",
+      "floors": 8,
+      "prompt": "tall grey concrete Tehran apartment block, 8 storeys, rows of small balconies with laundry and plants, air conditioners on walls, flat roof"
+    },
+    {
+      "id": "police_station",
+      "floors": 2,
+      "polycount": 60000,
+      "prompt": "two-storey Iranian police station (kalantari) building, white and green painted walls, barred windows, heavy metal entrance gate, small guard booth, perimeter wall, empty flagpole, damaged and sandbagged as if captured by militia, bullet marks"
+    }
+  ]
 }
