@@ -560,10 +560,11 @@ func use_rage() -> bool:
 	if _rage_light == null:
 		_rage_light = OmniLight3D.new()
 		_rage_light.light_color = Color(1.0, 0.12, 0.05)
-		_rage_light.omni_range = 5.0
+		_rage_light.omni_range = 4.0
+		_rage_light.light_specular = 0.0
 		_rage_light.position = Vector3(0, 1.4, 0)
 		add_child(_rage_light)
-	tw.tween_property(_rage_light, "light_energy", 1.6, 0.4).from(0.0)
+	tw.tween_property(_rage_light, "light_energy", 1.0, 0.4).from(0.0)
 	rage_changed.emit(true)
 	return true
 

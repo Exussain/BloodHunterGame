@@ -67,15 +67,12 @@ func _run() -> void:
 		if child.has_method(&"show_message"):
 			child.show_message("")
 
-	# 1. Tendril: yank a soldier off the edge of a rooftop across the lane.
-	var roof_z := 36.0
-	var roof_y := _roof_y(23.0, roof_z)
-	var lookout := _soldier(Vector3(21.2, roof_y + 0.1, roof_z))
+	# 1. Tendril: yank a soldier off the far side of the pool, over its tiled edge.
+	var lookout := _soldier(Vector3(-4.6, 0.5, 18), "militia_heavy")
 	await _physics(20)
-	_place(Vector3(9, 0.2, 46), lookout.global_position, 0.0)
-	_player._yaw.look_at(lookout.grab_point())
+	_place(Vector3(8, 0.2, 31), lookout.global_position, -0.08)
 	await _physics(4)
-	_player.use_tendril()
+	print("tendril grabbed: ", _player.use_tendril())
 	await _physics(9)
 	await _snap("01_tendril_grab")
 	await _physics(80)

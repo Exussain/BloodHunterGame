@@ -132,10 +132,11 @@ func _build_powers(root: Control) -> void:
 	row.add_theme_constant_override("separation", 36)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	row.position.y -= 110
+	row.position.y -= 150
 	root.add_child(row)
 	for entry in POWERS:
 		var l := UiUtil.label("[%s] %s" % [entry[2], tr(entry[1])], 30, Color(1, 0.85, 0.7))
+		l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		l.visible = false
 		row.add_child(l)
 		_power_labels[entry[0]] = l

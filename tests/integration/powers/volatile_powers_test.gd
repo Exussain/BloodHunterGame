@@ -53,6 +53,7 @@ func _run() -> void:
 
 	await _test_tendril_needs_unlock_returns_null()
 	await _test_tendril_pulls_soldier_down_at_feet()
+	await _test_tendril_yanks_soldier_off_rooftop()
 	await _test_scream_stuns_cone_and_alerts_earshot()
 	await _test_rage_spends_meter_and_shields()
 
@@ -88,6 +89,33 @@ func _test_tendril_pulls_soldier_down_at_feet() -> void:
 	_check(not _player.power_ready(&"tendril"), "tendril goes on cooldown")
 	target.free()
 	bystander.free()
+
+func _test_tendril_yanks_soldier_off_rooftop() -> void:
+	# Arrange: a lookout at the street edge of the lowest east-side roof (in tendril reach).
+	var space := _player.get_world_3d().direct_space_state
+	var roof := Vector3(0, 1000, 0)
+	for z in range(-40, 60, 2):
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(21, 80, z), Vector3(21, -1, z)))
+		if not hit.is_empty() and hit.position.y > 6.0 and hit.position.y < roof.y:
+			roof = hit.position
+	var lookout := _soldier(Vector3(20.8, roof.y + 0.1, roof.z) - PLAYER_POS)
+	await _frames(10)
+	var stand := Vector3(10, 0.2, roof.z + 8)
+	_player.global_position = stand
+	_player.velocity = Vector3.ZERO
+	_player._cooldowns[&"tendril"] = 0.0
+	_player._yaw.global_position = stand + Vector3.UP * 1.6
+	_player._yaw.look_at(lookout.grab_point())
+	_player._pitch.rotation.x = 0.0
+	await _frames(2)
+	# Act
+	var grabbed := _player.use_tendril()
+	await _frames(120)
+	# Assert
+	_check(grabbed == lookout, "tendril reaches a lookout on a rooftop (%.1f m up)" % roof.y)
+	_check(lookout.is_downed() and lookout.global_position.y < 1.0, "rooftop lookout lands downed on the street")
+	_player._yaw.rotation = Vector3.ZERO
+	lookout.free()
 
 func _test_scream_stuns_cone_and_alerts_earshot() -> void:
 	# Arrange

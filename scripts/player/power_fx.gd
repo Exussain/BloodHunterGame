@@ -11,19 +11,22 @@ class Tendril extends MeshInstance3D:
 	func _ready() -> void:
 		top_level = true
 		var tube := CylinderMesh.new()
-		tube.top_radius = 0.05
-		tube.bottom_radius = 0.11
+		tube.top_radius = 0.06
+		tube.bottom_radius = 0.13
 		tube.height = 1.0
 		tube.radial_segments = 8
 		tube.rings = 1
 		mesh = tube
 		var m := StandardMaterial3D.new()
-		m.albedo_color = Color(0.25, 0.01, 0.02)
-		m.roughness = 0.25
-		m.metallic_specular = 0.8
+		# Wet, dark flesh with a faint inner glow, so it reads at night without looking like a laser.
+		m.albedo_color = Color(0.32, 0.03, 0.04)
+		m.roughness = 0.2
+		m.metallic_specular = 0.9
+		m.rim_enabled = true
+		m.rim = 0.6
 		m.emission_enabled = true
-		m.emission = Color(0.9, 0.08, 0.05)
-		m.emission_energy_multiplier = 1.4
+		m.emission = Color(0.7, 0.05, 0.04)
+		m.emission_energy_multiplier = 0.45
 		material_override = m
 		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -76,10 +79,11 @@ static func scream_wave(parent: Node, origin: Vector3, forward: Vector3, reach: 
 	ring.scale = Vector3.ONE * 0.4
 	var flash := OmniLight3D.new()
 	flash.light_color = Color(1.0, 0.2, 0.1)
-	flash.light_energy = 6.0
+	flash.light_energy = 3.0
 	flash.omni_range = reach * 0.6
+	flash.light_specular = 0.0
 	parent.add_child(flash)
-	flash.global_position = origin + flat * 2.0
+	flash.global_position = origin + flat * 4.0 + Vector3.UP * 1.0
 	var tw := ring.create_tween().set_parallel()
 	tw.tween_property(ring, "global_position", origin + flat * reach * 0.8, 0.55).set_ease(Tween.EASE_OUT)
 	tw.tween_property(ring, "scale", Vector3.ONE * reach * 0.35, 0.55).set_ease(Tween.EASE_OUT)
