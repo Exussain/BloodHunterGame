@@ -4,3 +4,11 @@
 /export/
 tools/assets/raw/
 __pycache__/
+
+# Claude Code Game Studios (per-developer and session files)
+.claude/settings.local.json
+.claude/agent-memory/
+CLAUDE.local.md
+project.local.yaml
+production/session-logs/
+production/session-state/
