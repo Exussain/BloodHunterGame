@@ -25,6 +25,7 @@ Controls: WASD move, Shift sprint, Space jump, left click claw, hold right click
 
 - **Characters** (volatile + 4 militia types): GPT Image 2.5 concept in A-pose, image-to-3D, auto-rig, then a preset animation set (volatile: idle, run, stalk, climb, wall-run, pounce, claw, scream, feed, death; militia: idle, patrol, combat, hit, down, death). Saved to `assets/characters/<id>/`.
 - **Props** (armed Zamyad pickup, Paykan, sandbags, streetlight, rooftop tank and cooler, checkpoint barrier, tiled pool): concept, image-to-3D, saved to `assets/props/<id>/`.
+- **Buildings** (four Tehran apartment blocks and the captured کلانتری): concept, image-to-3D with 2K textures, saved to `assets/buildings/<id>/` with a `windows.png` glass mask. At night `assets/shaders/spatial_env_window_glow.gdshader` lights a random share of the windows.
 - **Textures** (brick, stone and concrete facades, wet asphalt, sidewalk, pool tiles, station wall): image only, then made seamless. Saved to `assets/textures/`.
 
 Concept art goes to `tools/assets/concepts/`. Models are shrunk about 8x with `gltf-transform` (1K WebP textures) when it's installed. Finished Meshy task ids are cached in `tools/assets/state.json`, so re-runs never pay twice, and failed tasks (refunded by Meshy) are retried automatically. The game swaps each greybox for its generated asset when the file exists.
