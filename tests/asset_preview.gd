@@ -1,6 +1,6 @@
 extends SceneTree
 ## Renders a studio preview of every generated model (needs a GPU or software Vulkan):
-##   godot -s res://tests/asset_preview.gd -- <output_dir>
+##   godot -s res://tests/asset_preview.gd -- <output_dir> [props,characters,buildings]
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -11,6 +11,9 @@ func _run() -> void:
 	if not args.is_empty():
 		out = args[0]
 	DirAccess.make_dir_recursive_absolute(out)
+	var kinds := ["props", "characters", "buildings"]
+	if args.size() > 1:
+		kinds = Array(args[1].split(","))
 
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -30,7 +33,7 @@ func _run() -> void:
 	root.add_child(cam)
 	cam.make_current()
 
-	for kind in ["props", "characters", "buildings"]:
+	for kind: String in kinds:
 		var dir := DirAccess.open("res://assets/" + kind)
 		if dir == null:
 			continue
@@ -51,8 +54,8 @@ func _run() -> void:
 			# Buildings get all four sides, to check which way the front faces.
 			var views := [0.0, 90.0, 180.0, 270.0] if kind == "buildings" else [0.0]
 			for yaw: float in views:
-				var dir := Vector3(0.5, 0.25, 1.0).normalized().rotated(Vector3.UP, deg_to_rad(yaw))
-				cam.position = c + dir * r * 1.7
+				var view_dir := Vector3(0.5, 0.25, 1.0).normalized().rotated(Vector3.UP, deg_to_rad(yaw))
+				cam.position = c + view_dir * r * 1.7
 				cam.look_at(c)
 				for i in 4:
 					await process_frame
