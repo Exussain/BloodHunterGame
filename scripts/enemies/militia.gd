@@ -1,9 +1,10 @@
 class_name Militia
 extends CharacterBody3D
 ## Placeholder traitor militia soldier: patrols, spots the volatile, shoots.
-## Full AI (cover, flanking, alarms, panic) and gore come in later build steps.
+## The volatile's powers can grab (tendril), stun and panic (scream, rage) it.
+## Full AI (cover, flanking, alarms) and gore come in later build steps.
 
-enum State { PATROL, ALERT, DOWNED, FED_ON, DEAD }
+enum State { PATROL, ALERT, DOWNED, FED_ON, DEAD, GRABBED, STUNNED, PANIC }
 
 @export var max_health := 90.0
 @export var walk_speed := 2.2
@@ -27,6 +28,18 @@ var _patrol_index := 0
 var _fire_timer := 0.0
 var _player: Volatile
 var _feeder: Node3D
+## Tendril grab: who is pulling, from where, and how far along the arc (0..1).
+var _grabber: Node3D
+var _grab_from := Vector3.ZERO
+var _grab_t := 0.0
+var _grab_time := 0.5
+var _grab_arc := 2.5
+var _grab_drop := 1.3
+## Stun, then panic: seconds left in each, and how fast it runs while panicking.
+var _stun_left := 0.0
+var _panic_left := 0.0
+var _panic_speed := 4.6
+var _saved_layers := Vector2i.ZERO
 
 func _ready() -> void:
 	add_to_group(&"militia")
@@ -91,12 +104,19 @@ func is_downed() -> bool:
 	return state == State.DOWNED
 
 func is_alive_body() -> bool:
-	return state in [State.PATROL, State.ALERT, State.DOWNED]
+	return state in [State.PATROL, State.ALERT, State.DOWNED, State.STUNNED, State.PANIC]
+
+## Standing and able to fight back (or about to).
+func is_standing() -> bool:
+	return state in [State.PATROL, State.ALERT, State.STUNNED, State.PANIC]
+
+func is_panicking() -> bool:
+	return state in [State.STUNNED, State.PANIC]
 
 # --- Damage -----------------------------------------------------------------
 
 func take_damage(amount: float, source: Node3D) -> void:
-	if state in [State.DOWNED, State.FED_ON, State.DEAD]:
+	if state in [State.DOWNED, State.FED_ON, State.DEAD, State.GRABBED]:
 		return
 	health -= amount
 	_spawn_blood(global_position + Vector3.UP * 1.2, 0.5)
@@ -108,7 +128,7 @@ func take_damage(amount: float, source: Node3D) -> void:
 			_hit_until = Time.get_ticks_msec() / 1000.0 + 0.5
 
 func take_pounce(source: Node3D) -> void:
-	if state in [State.PATROL, State.ALERT]:
+	if is_standing():
 		_spawn_blood(global_position + Vector3.UP * 1.0, 0.8)
 		_go_down()
 		_alert_nearby(source)
@@ -136,7 +156,110 @@ func _go_down() -> void:
 func _alert(source: Node3D) -> void:
 	if source is Volatile:
 		_player = source
-	state = State.ALERT
+	# Panic and grabs outrank the alarm; they turn hostile once they recover.
+	if state in [State.PATROL, State.ALERT]:
+		state = State.ALERT
+
+## Hearing a scream or a fight nearby turns a patrolling soldier hostile.
+func hear_threat(source: Node3D) -> void:
+	if state == State.PATROL:
+		_alert(source)
+
+# --- Volatile powers ----------------------------------------------------------
+
+## Tendril grab: yanked through the air in an arc to `drop` metres in front of
+## the grabber, ignoring walls and damage on the way, then dropped downed.
+func begin_grab(grabber: Node3D, pull_speed: float, arc_height: float, drop: float) -> void:
+	if not is_standing():
+		return
+	state = State.GRABBED
+	_grabber = grabber
+	_grab_from = global_position
+	_grab_t = 0.0
+	_grab_arc = arc_height
+	_grab_drop = drop
+	_grab_time = maxf(_grab_from.distance_to(grabber.global_position) / pull_speed, 0.2)
+	_muzzle_light.light_energy = 0.0
+	_saved_layers = Vector2i(collision_layer, collision_mask)
+	collision_layer = 0
+	collision_mask = 0
+	GeneratedAssets.play(_anim, &"hit", 0.05, 0.6)
+
+func is_grabbed() -> bool:
+	return state == State.GRABBED
+
+func grab_point() -> Vector3:
+	return global_position + Vector3.UP * 1.3
+
+func _process_grab(delta: float) -> void:
+	velocity = Vector3.ZERO
+	if not is_instance_valid(_grabber):
+		_end_grab()
+		return
+	var fwd := -_grabber.global_basis.z
+	if _grabber.has_method(&"facing"):
+		fwd = _grabber.facing()
+	var to := _grabber.global_position + Vector3(fwd.x, 0, fwd.z).normalized() * _grab_drop
+	_grab_t = minf(_grab_t + delta / _grab_time, 1.0)
+	# Ease in so the yank snaps, with a hop over whatever is between them.
+	var t := 1.0 - pow(1.0 - _grab_t, 2.0)
+	global_position = _grab_from.lerp(to, t) + Vector3.UP * sin(t * PI) * _grab_arc
+	var look := to - _grab_from
+	look.y = 0
+	if look.length() > 0.1:
+		_face(look.normalized())
+	if _grab_t >= 1.0:
+		_end_grab()
+
+func _end_grab() -> void:
+	collision_layer = _saved_layers.x
+	collision_mask = _saved_layers.y
+	_spawn_blood(global_position + Vector3.UP * 0.5, 0.9)
+	_go_down()
+
+## Scream: stunned on the spot, then panics and runs from `source`.
+func stun(source: Node3D, stun_time: float, panic_time: float, panic_speed: float) -> void:
+	if not is_standing():
+		return
+	if source is Volatile:
+		_player = source
+	state = State.STUNNED
+	_stun_left = stun_time
+	_panic_left = panic_time
+	_panic_speed = panic_speed
+	_muzzle_light.light_energy = 0.0
+	GeneratedAssets.play(_anim, &"hit", 0.05, 0.5)
+
+## Rage form: panics straight away (no stun) and flees.
+func panic(source: Node3D, panic_time: float, panic_speed: float) -> void:
+	if not is_standing():
+		return
+	if source is Volatile:
+		_player = source
+	state = State.PANIC
+	_panic_left = maxf(_panic_left, panic_time)
+	_panic_speed = panic_speed
+
+func _process_panic(delta: float) -> void:
+	if state == State.STUNNED:
+		velocity.x = 0
+		velocity.z = 0
+		_stun_left -= delta
+		if _stun_left <= 0:
+			state = State.PANIC
+		return
+	_panic_left -= delta
+	if _panic_left <= 0:
+		state = State.ALERT if _player and _player.health > 0 else State.PATROL
+		return
+	var away := Vector3.FORWARD
+	if _player:
+		away = global_position - _player.global_position
+		away.y = 0
+		away = away.normalized() if away.length() > 0.1 else Vector3.FORWARD
+	velocity.x = away.x * _panic_speed
+	velocity.z = away.z * _panic_speed
+	_face(away)
 
 func _alert_nearby(source: Node3D) -> void:
 	for other in get_tree().get_nodes_in_group(&"militia"):
@@ -169,6 +292,12 @@ func _physics_process(delta: float) -> void:
 			_look_for_player()
 		State.ALERT:
 			_combat(delta)
+		State.GRABBED:
+			_process_grab(delta)
+			_update_animation()
+			return
+		State.STUNNED, State.PANIC:
+			_process_panic(delta)
 		_:
 			velocity.x = 0
 			velocity.z = 0
@@ -185,6 +314,9 @@ func _update_animation() -> void:
 			GeneratedAssets.play(_anim, &"patrol" if moving else &"idle", 0.3)
 		State.ALERT:
 			GeneratedAssets.play(_anim, &"combat", 0.2)
+		State.PANIC:
+			# No run clip yet: a sped-up patrol walk reads as fleeing.
+			GeneratedAssets.play(_anim, &"patrol", 0.2, 2.2)
 
 func _patrol() -> void:
 	if patrol_points.is_empty():

@@ -1,7 +1,11 @@
 extends CanvasLayer
-## In-game HUD (RTL): health, mutation meter, pounce charge, prompts, pause menu.
+## In-game HUD (RTL): health, mutation meter, pounce charge, powers, prompts,
+## the rage-form screen filter and the pause menu.
 
 const UNLOCK_KEYS := {&"tendril": "UNLOCK_TENDRIL", &"scream": "UNLOCK_SCREAM", &"rage": "UNLOCK_RAGE"}
+## Each power's HUD label and the key shown with it, in unlock order.
+const POWERS := [[&"tendril", "POWER_TENDRIL", "Q"], [&"scream", "POWER_SCREAM", "F"], [&"rage", "POWER_RAGE", "R"]]
+const RAGE_FILTER := preload("res://assets/shaders/canvas_fx_rage_filter.gdshader")
 
 var _health: ProgressBar
 var _mutation: ProgressBar
@@ -9,6 +13,9 @@ var _pounce: ProgressBar
 var _feed_hint: Label
 var _message: Label
 var _pause: Control
+var _power_labels := {}
+var _rage_filter: ColorRect
+var _player: Volatile
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -62,6 +69,7 @@ func _ready() -> void:
 	_message.visible = false
 	root.add_child(_message)
 
+	_build_powers(root)
 	_build_pause(root)
 
 func bind(player: Volatile) -> void:
@@ -75,7 +83,15 @@ func bind(player: Volatile) -> void:
 		_pounce.visible = v > 0.0
 		_pounce.value = v)
 	player.feed_target_changed.connect(func(on: bool) -> void: _feed_hint.visible = on)
-	player.power_unlocked.connect(func(power: StringName) -> void: show_message(tr(UNLOCK_KEYS[power]), 3.0))
+	player.power_unlocked.connect(func(power: StringName) -> void:
+		show_message(tr(UNLOCK_KEYS[power]), 3.0)
+		_refresh_powers())
+	player.power_cooldown_changed.connect(func(power: StringName, left: float, _total: float) -> void:
+		_set_power_state(power, left))
+	player.mutation_changed.connect(func(_v: float, _m: float) -> void: _refresh_powers())
+	player.rage_changed.connect(_on_rage_changed)
+	_player = player
+	_refresh_powers()
 
 func show_message(text: String, seconds := 0.0) -> void:
 	_message.text = text
@@ -108,6 +124,67 @@ func _tint(bar: ProgressBar, color: Color) -> void:
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0, 0, 0, 0.55)
 	bar.add_theme_stylebox_override("background", bg)
+
+# --- Powers -----------------------------------------------------------------
+
+func _build_powers(root: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 36)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	row.position.y -= 110
+	root.add_child(row)
+	for entry in POWERS:
+		var l := UiUtil.label("[%s] %s" % [entry[2], tr(entry[1])], 30, Color(1, 0.85, 0.7))
+		l.visible = false
+		row.add_child(l)
+		_power_labels[entry[0]] = l
+	# Rage form: a pulsing red, warped filter over the whole screen.
+	_rage_filter = ColorRect.new()
+	_rage_filter.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_rage_filter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = RAGE_FILTER
+	_rage_filter.material = m
+	_rage_filter.visible = false
+	root.add_child(_rage_filter)
+	root.move_child(_rage_filter, 0)
+
+func _refresh_powers() -> void:
+	if _player == null:
+		return
+	for entry in POWERS:
+		var power: StringName = entry[0]
+		var l: Label = _power_labels[power]
+		l.visible = _player.unlocked.has(power)
+		var ready := _player.power_ready(power) or (power == &"rage" and _player.is_raging())
+		l.modulate = Color.WHITE if ready else Color(1, 1, 1, 0.35)
+
+func _set_power_state(power: StringName, left: float) -> void:
+	var l: Label = _power_labels[power]
+	var entry: Array = POWERS.filter(func(e: Array) -> bool: return e[0] == power)[0]
+	var text := "[%s] %s" % [entry[2], tr(entry[1])]
+	if left > 0.0:
+		# Persian digits for the seconds left.
+		text += " " + _fa_digits(str(ceili(left)))
+	l.text = text
+	l.modulate = Color.WHITE if left <= 0.0 else Color(1, 1, 1, 0.35)
+
+func _on_rage_changed(active: bool) -> void:
+	_rage_filter.visible = true
+	var m := _rage_filter.material as ShaderMaterial
+	var tw := create_tween()
+	tw.tween_method(func(v: float) -> void: m.set_shader_parameter(&"strength", v),
+		0.0 if active else 1.0, 1.0 if active else 0.0, 0.4)
+	if not active:
+		tw.tween_callback(func() -> void: _rage_filter.visible = false)
+	_refresh_powers()
+
+static func _fa_digits(text: String) -> String:
+	var out := ""
+	for ch in text:
+		out += char(0x06F0 + int(ch)) if ch >= "0" and ch <= "9" else ch
+	return out
 
 # --- Pause ------------------------------------------------------------------
 

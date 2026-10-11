@@ -1,13 +1,17 @@
 class_name Volatile
 extends CharacterBody3D
 ## The player: the lone volatile. Third-person predator movement with
-## wall-climb, wall-run, charged pounce, claw attack and feeding.
+## wall-climb, wall-run, charged pounce, claw attack and feeding, plus the
+## powers feeding unlocks: tendril grab, scream and rage form.
 
 signal health_changed(value: float, max_value: float)
 signal mutation_changed(value: float, max_value: float)
 signal pounce_charge_changed(value: float)
 signal feed_target_changed(available: bool)
 signal power_unlocked(power: StringName)
+## Seconds left on a power's cooldown (0 when ready) and its full length.
+signal power_cooldown_changed(power: StringName, left: float, total: float)
+signal rage_changed(active: bool)
 signal died
 
 enum State { GROUND, AIR, CLIMB, WALL_RUN, POUNCE, FEED }
@@ -16,6 +20,8 @@ const MAX_HEALTH := 100.0
 const MAX_MUTATION := 100.0
 ## Mutation needed for each power, in unlock order (see core design skill tree).
 const UNLOCKS := [[25.0, &"tendril"], [50.0, &"scream"], [100.0, &"rage"]]
+## Power tuning (ranges, cooldowns, rage multipliers); see design/quick-specs/volatile-powers-*.md.
+const POWERS_PATH := "res://assets/data/volatile_powers.json"
 
 @export var walk_speed := 6.5
 @export var sprint_speed := 12.0
@@ -57,6 +63,12 @@ var _feed_left := 0.0
 var _feed_target: Node3D
 var _claw_cooldown := 0.0
 var _feed_available := false
+var _powers: Dictionary
+var _cooldowns := {&"tendril": 0.0, &"scream": 0.0}
+var _rage_left := 0.0
+var _fear_tick := 0.0
+var _arm: SpringArm3D
+var _rage_light: OmniLight3D
 
 func _ready() -> void:
 	add_to_group(&"player")
@@ -64,12 +76,29 @@ func _ready() -> void:
 	_build_body()
 	_build_camera()
 	_build_rays()
+	_powers = JSON.parse_string(FileAccess.get_file_as_string(POWERS_PATH))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	health_changed.emit.call_deferred(health, MAX_HEALTH)
 	mutation_changed.emit.call_deferred(mutation, MAX_MUTATION)
 
 func get_camera() -> Camera3D:
 	return _camera
+
+## The way the volatile's body faces (flat), used to drop grabbed soldiers in front of it.
+func facing() -> Vector3:
+	var f := -_model.global_basis.z
+	f.y = 0
+	return f.normalized() if f.length() > 0.01 else Vector3.FORWARD
+
+func is_raging() -> bool:
+	return _rage_left > 0.0
+
+func power_ready(power: StringName) -> bool:
+	if not unlocked.has(power):
+		return false
+	if power == &"rage":
+		return not is_raging() and mutation >= float(_powers.rage.cost)
+	return _cooldowns[power] <= 0.0
 
 # --- Construction ---------------------------------------------------------
 
@@ -128,16 +157,16 @@ func _build_camera() -> void:
 	_pitch = Node3D.new()
 	_pitch.rotation.x = -0.25
 	_yaw.add_child(_pitch)
-	var arm := SpringArm3D.new()
-	arm.spring_length = 3.8
-	arm.position = Vector3(0.6, 0.2, 0)
-	arm.margin = 0.2
-	arm.add_excluded_object(get_rid())
-	_pitch.add_child(arm)
+	_arm = SpringArm3D.new()
+	_arm.spring_length = 3.8
+	_arm.position = Vector3(0.6, 0.2, 0)
+	_arm.margin = 0.2
+	_arm.add_excluded_object(get_rid())
+	_pitch.add_child(_arm)
 	_camera = Camera3D.new()
 	_camera.fov = 75.0
 	_camera.far = 800.0
-	arm.add_child(_camera)
+	_arm.add_child(_camera)
 	_camera.make_current()
 	# Soft fill light that travels with the camera so the volatile never turns into a silhouette.
 	var fill := OmniLight3D.new()
@@ -175,7 +204,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_yaw.global_position = global_position + Vector3.UP * 1.6
 	_claw_cooldown = maxf(_claw_cooldown - delta, 0.0)
+	_tick_powers(delta)
 	_update_feed_target()
+	if state != State.FEED and health > 0:
+		_handle_powers()
 
 	match state:
 		State.FEED:
@@ -208,7 +240,7 @@ func _input_dir() -> Vector3:
 func _process_move(delta: float) -> void:
 	var dir := _input_dir()
 	var on_floor := is_on_floor()
-	var speed := sprint_speed if Input.is_action_pressed("sprint") else walk_speed
+	var speed := (sprint_speed if Input.is_action_pressed("sprint") else walk_speed) * _speed_mult()
 	var a := accel if on_floor else air_accel
 	var target := dir * speed
 	velocity.x = move_toward(velocity.x, target.x, a * delta)
@@ -256,7 +288,8 @@ func _enter_climb(normal: Vector3) -> void:
 func _process_climb(delta: float) -> void:
 	var v := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var wall_right := Vector3.UP.cross(_wall_normal).normalized()
-	velocity = Vector3.UP * (-v.y * climb_speed) + wall_right * (-v.x * climb_speed * 0.8) - _wall_normal * 2.0
+	var climb := climb_speed * _speed_mult()
+	velocity = Vector3.UP * (-v.y * climb) + wall_right * (-v.x * climb * 0.8) - _wall_normal * 2.0
 
 	if Input.is_action_just_pressed("jump"):
 		# Kick off the wall.
@@ -326,7 +359,7 @@ func _launch_pounce(charge: float) -> void:
 
 func _process_pounce(delta: float) -> void:
 	velocity.y -= _gravity * gravity_scale * 0.8 * delta
-	for enemy in _enemies_in_range(1.6, false):
+	for enemy in _enemies_in_range(2.4 if is_raging() else 1.6, false):
 		enemy.take_pounce(self)
 		velocity = Vector3(0, 2.0, 0)
 		state = State.AIR
@@ -350,7 +383,7 @@ func _claw() -> void:
 		var to: Vector3 = enemy.global_position - global_position
 		to.y = 0
 		if to.normalized().dot(forward) > 0.3:
-			enemy.take_damage(claw_damage, self)
+			enemy.take_damage(claw_damage * (float(_powers.rage.claw_mult) if is_raging() else 1.0), self)
 
 # Feed --------------------------------------------------------------------
 
@@ -402,6 +435,8 @@ func heal(amount: float) -> void:
 func take_damage(amount: float) -> void:
 	if health <= 0:
 		return
+	if is_raging():
+		amount *= float(_powers.rage.damage_taken_mult)
 	health = maxf(health - amount, 0.0)
 	health_changed.emit(health, MAX_HEALTH)
 	if health <= 0:
@@ -415,6 +450,150 @@ func add_mutation(amount: float) -> void:
 		if mutation >= entry[0] and not unlocked.has(entry[1]):
 			unlocked.append(entry[1])
 			power_unlocked.emit(entry[1])
+
+# Powers ------------------------------------------------------------------
+
+func _handle_powers() -> void:
+	if Input.is_action_just_pressed("tendril"):
+		use_tendril()
+	if Input.is_action_just_pressed("scream"):
+		use_scream()
+	if Input.is_action_just_pressed("rage"):
+		use_rage()
+
+func _tick_powers(delta: float) -> void:
+	for power: StringName in _cooldowns:
+		if _cooldowns[power] > 0.0:
+			_cooldowns[power] = maxf(_cooldowns[power] - delta, 0.0)
+			power_cooldown_changed.emit(power, _cooldowns[power], float(_powers[power].cooldown))
+	if not is_raging():
+		return
+	_rage_left = maxf(_rage_left - delta, 0.0)
+	# Soldiers who see the rage form break and run.
+	_fear_tick -= delta
+	if _fear_tick <= 0.0:
+		_fear_tick = 0.4
+		for e: Militia in get_tree().get_nodes_in_group(&"militia"):
+			if e.is_standing() and not e.is_panicking() \
+					and e.global_position.distance_to(global_position) <= float(_powers.rage.fear_range) \
+					and _can_see(e):
+				e.panic(self, float(_powers.scream.panic_time), float(_powers.militia.panic_speed))
+	if _rage_left <= 0.0:
+		_end_rage()
+
+func _start_cooldown(power: StringName) -> void:
+	_cooldowns[power] = float(_powers[power].cooldown)
+	power_cooldown_changed.emit(power, _cooldowns[power], _cooldowns[power])
+
+## Tendril grab: yanks the soldier nearest the crosshair to the volatile's feet, downed.
+## Returns the grabbed soldier, or null if nothing was in reach.
+func use_tendril() -> Militia:
+	if not power_ready(&"tendril"):
+		return null
+	var p: Dictionary = _powers.tendril
+	var target := _tendril_target(float(p.range), deg_to_rad(float(p.aim_cone_deg)))
+	if target == null:
+		return null
+	_start_cooldown(&"tendril")
+	_play_oneshot(&"claw", 0.5)
+	target.begin_grab(self, float(p.pull_speed), float(p.arc_height), float(p.drop_distance))
+	PowerFx.tendril(get_parent(), self, target)
+	return target
+
+func _tendril_target(reach: float, cone: float) -> Militia:
+	var eye := _camera.global_position
+	var aim := -_camera.global_basis.z
+	var best: Militia
+	var best_angle := cone
+	for e: Militia in get_tree().get_nodes_in_group(&"militia"):
+		if not e.is_standing() or e.global_position.distance_to(global_position) > reach:
+			continue
+		var angle := aim.angle_to(e.grab_point() - eye)
+		if angle < best_angle and _can_see(e):
+			best = e
+			best_angle = angle
+	return best
+
+## Scream: stuns and panics the squad in front; everyone else in earshot turns hostile.
+## Returns how many soldiers it stunned.
+func use_scream() -> int:
+	if not power_ready(&"scream"):
+		return 0
+	var p: Dictionary = _powers.scream
+	_start_cooldown(&"scream")
+	_play_oneshot(&"scream", 1.0)
+	var forward := -_camera.global_basis.z
+	forward.y = 0
+	forward = forward.normalized()
+	_model.global_basis = Basis.looking_at(forward)
+	PowerFx.scream_wave(get_parent(), global_position + Vector3.UP * 1.4, forward, float(p.range))
+	_shake_camera(0.5, 0.12)
+	var stunned := 0
+	for e: Militia in get_tree().get_nodes_in_group(&"militia"):
+		if not e.is_standing():
+			continue
+		var to := e.global_position - global_position
+		var dist := to.length()
+		to.y = 0
+		if dist <= float(p.range) and forward.angle_to(to) <= deg_to_rad(float(p.cone_deg)) and _can_see(e):
+			e.stun(self, float(p.stun_time), float(p.panic_time), float(_powers.militia.panic_speed))
+			stunned += 1
+		elif dist <= float(p.hear_range):
+			e.hear_threat(self)
+	return stunned
+
+## Rage form: spends a full mutation meter for a timed, near-unkillable super state.
+func use_rage() -> bool:
+	if not power_ready(&"rage"):
+		return false
+	var p: Dictionary = _powers.rage
+	_rage_left = float(p.duration)
+	_fear_tick = 0.0
+	mutation = maxf(mutation - float(p.cost), 0.0)
+	mutation_changed.emit(mutation, MAX_MUTATION)
+	_play_oneshot(&"scream", 1.0)
+	_shake_camera(0.7, 0.18)
+	var tw := create_tween().set_parallel()
+	tw.tween_property(_model, "scale", Vector3.ONE * float(p.scale), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_arm, "spring_length", 4.8, 0.5)
+	tw.tween_property(_camera, "fov", 84.0, 0.5)
+	if _rage_light == null:
+		_rage_light = OmniLight3D.new()
+		_rage_light.light_color = Color(1.0, 0.12, 0.05)
+		_rage_light.omni_range = 5.0
+		_rage_light.position = Vector3(0, 1.4, 0)
+		add_child(_rage_light)
+	tw.tween_property(_rage_light, "light_energy", 1.6, 0.4).from(0.0)
+	rage_changed.emit(true)
+	return true
+
+func _end_rage() -> void:
+	_rage_left = 0.0
+	var tw := create_tween().set_parallel()
+	tw.tween_property(_model, "scale", Vector3.ONE, 0.5)
+	tw.tween_property(_arm, "spring_length", 3.8, 0.6)
+	tw.tween_property(_camera, "fov", 75.0, 0.6)
+	if _rage_light:
+		tw.tween_property(_rage_light, "light_energy", 0.0, 0.5)
+	rage_changed.emit(false)
+
+func _speed_mult() -> float:
+	return float(_powers.rage.speed_mult) if is_raging() else 1.0
+
+func _can_see(e: Militia) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3.UP * 1.4, e.grab_point())
+	q.exclude = [get_rid(), e.get_rid()]
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+func _shake_camera(seconds: float, strength: float) -> void:
+	var tw := create_tween()
+	var steps := int(seconds / 0.04)
+	for i in steps:
+		var k := strength * (1.0 - float(i) / steps)
+		tw.tween_property(_camera, "h_offset", randf_range(-k, k), 0.04)
+		tw.parallel().tween_property(_camera, "v_offset", randf_range(-k, k), 0.04)
+	tw.tween_property(_camera, "h_offset", 0.0, 0.04)
+	tw.parallel().tween_property(_camera, "v_offset", 0.0, 0.04)
 
 # Helpers -----------------------------------------------------------------
 

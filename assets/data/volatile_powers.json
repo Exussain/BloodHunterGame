@@ -1,0 +1,30 @@
+{
+	"tendril": {
+		"range": 22.0,
+		"aim_cone_deg": 7.0,
+		"cooldown": 6.0,
+		"pull_speed": 26.0,
+		"arc_height": 2.5,
+		"drop_distance": 1.3
+	},
+	"scream": {
+		"range": 16.0,
+		"cone_deg": 55.0,
+		"cooldown": 12.0,
+		"stun_time": 2.5,
+		"panic_time": 6.0,
+		"hear_range": 35.0
+	},
+	"rage": {
+		"duration": 12.0,
+		"cost": 100.0,
+		"scale": 1.25,
+		"speed_mult": 1.4,
+		"claw_mult": 2.5,
+		"damage_taken_mult": 0.15,
+		"fear_range": 20.0
+	},
+	"militia": {
+		"panic_speed": 4.6
+	}
+}

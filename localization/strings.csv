@@ -17,9 +17,12 @@ HUD_MUTATION,جهش,Mutation
 HUD_POUNCE,جهش حمله,Pounce
 HUD_FEED_HINT,[E] تغذیه,[E] Feed
 HUD_CONTROLS,"حرکت: WASD | دویدن: Shift | پرش: Space | چنگ: کلیک چپ | جهش حمله: نگه‌داشتن کلیک راست | بالا رفتن: به سمت دیوار حرکت کن","Move: WASD | Sprint: Shift | Jump: Space | Claw: Left click | Pounce: hold Right click | Climb: move into a wall"
-UNLOCK_TENDRIL,قدرت جدید: چنگک,New power: Tendril grab
+UNLOCK_TENDRIL,قدرت جدید: شاخک,New power: Tendril grab
 UNLOCK_SCREAM,قدرت جدید: جیغ,New power: Scream
 UNLOCK_RAGE,قدرت جدید: خشم,New power: Rage form
+POWER_TENDRIL,شاخک,Tendril
+POWER_SCREAM,جیغ,Scream
+POWER_RAGE,خشم,Rage
 PAUSE_TITLE,توقف,Paused
 PAUSE_RESUME,ادامه,Resume
 PAUSE_MENU,منوی اصلی,Main menu
