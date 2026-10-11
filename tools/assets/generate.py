@@ -374,7 +374,9 @@ def make_window_emission(glb, dest):
     rgb = np.asarray(img, dtype=np.float32) / 255.0
     value = rgb.max(axis=2)
     sat = (value - rgb.min(axis=2)) / np.maximum(value, 1e-4)
-    dark = (value < 0.32) & (sat < 0.45)
+    # Painted trim (the station's green bands) is dark too, but never glass.
+    greenish = rgb[..., 1] > np.maximum(rgb[..., 0], rgb[..., 2]) + 0.015
+    dark = (value < 0.32) & (sat < 0.45) & ~greenish
     bluish = (rgb[..., 2] > rgb[..., 0] + 0.04) & (value < 0.55)
     warm_lit = (value > 0.8) & (sat > 0.3) & (rgb[..., 0] > rgb[..., 2])
     mask = Image.fromarray(((dark | bluish | warm_lit) * 255).astype(np.uint8))
