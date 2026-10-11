@@ -17,6 +17,7 @@ func _ready() -> void:
 	_build_pools()
 	_build_blocks()
 	_build_station()
+	_build_parked_cars()
 	_build_streetlights()
 	_spawn_militia()
 	_spawn_player()
@@ -55,8 +56,8 @@ func _mat(key: String) -> StandardMaterial3D:
 		"window":
 			m.albedo_color = Color(0.1, 0.08, 0.05)
 			m.emission_enabled = true
-			m.emission = Color(1.0, 0.78, 0.5)
-			m.emission_energy_multiplier = 2.5
+			m.emission = Color(1.0, 0.72, 0.42)
+			m.emission_energy_multiplier = 1.1
 		"window_cold":
 			m.albedo_color = Color(0.05, 0.07, 0.1)
 			m.emission_enabled = true
@@ -89,10 +90,10 @@ const TEXTURED := {
 	"sidewalk": ["sidewalk_tiles", 0.6, 2.0],
 	"pool_edge": ["pool_tiles", 0.35, 1.0],
 	"station": ["station_wall", 0.85, 4.0],
-	"block0": ["facade_brick", 0.85, 6.0],
-	"block1": ["facade_stone", 0.75, 6.0],
-	"block2": ["facade_concrete", 0.9, 6.0],
-	"block3": ["facade_brick", 0.85, 6.0],
+	"block0": ["facade_brick", 0.85, 3.0],
+	"block1": ["facade_stone", 0.75, 4.0],
+	"block2": ["facade_concrete", 0.9, 5.0],
+	"block3": ["facade_brick", 0.85, 3.0],
 }
 
 func _generated_mat(key: String) -> StandardMaterial3D:
@@ -105,16 +106,25 @@ func _generated_mat(key: String) -> StandardMaterial3D:
 	return m
 
 ## Swaps a greybox's mesh for a generated prop scaled to fill it, keeping its collision.
-func _dress(box: MeshInstance3D, prop_id: String, fit_size := Vector3.ZERO) -> void:
+## Swaps a greybox's mesh for a generated prop scaled to fill it, keeping its collision.
+## `fit_size` overrides the box size (props taller than their collider), and `yaw_deg`
+## turns the prop inside the box (Meshy props face +Z with their long side on X).
+func _dress(box: MeshInstance3D, prop_id: String, fit_size := Vector3.ZERO, yaw_deg := 0.0) -> MeshInstance3D:
 	var prop := GeneratedAssets.prop(prop_id)
 	if prop == null:
-		return
-	var size: Vector3 = fit_size if fit_size != Vector3.ZERO else (box.mesh as BoxMesh).size
-	box.add_child(prop)
-	GeneratedAssets.fit_prop(prop, size)
-	if fit_size != Vector3.ZERO:
-		prop.position.y += (fit_size.y - (box.mesh as BoxMesh).size.y) * 0.5
+		return box
+	var box_size := (box.mesh as BoxMesh).size
+	var size: Vector3 = fit_size if fit_size != Vector3.ZERO else box_size
+	var pivot := Node3D.new()
+	pivot.rotation_degrees.y = yaw_deg
+	box.add_child(pivot)
+	pivot.add_child(prop)
+	# Fit in the prop's own frame: a quarter turn swaps width and depth.
+	var local := Vector3(size.z, size.y, size.x) if is_equal_approx(absf(fmod(yaw_deg, 180.0)), 90.0) else size
+	GeneratedAssets.fit_prop(prop, local)
+	prop.position.y += (size.y - box_size.y) * 0.5
 	box.mesh = null
+	return box
 
 func _box(size: Vector3, pos: Vector3, mat: Material, collide := true) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -211,10 +221,13 @@ func _build_pools() -> void:
 	for i in 7:
 		var z := -60.0 + i * 20.0
 		_box(Vector3(6.4, 0.6, 12.4), Vector3(0, 0.3, z), _mat("pool_edge"))
-		_box(Vector3(5.6, 0.05, 11.6), Vector3(0, 0.56, z), _mat("water"), false)
-	var sign_label := _persian_label(tr("SQUARE_SIGN"), 220, Color(0.95, 0.95, 0.9))
-	sign_label.position = Vector3(0, 4.5, 78)
-	add_child(sign_label)
+		_box(Vector3(5.8, 0.02, 11.8), Vector3(0, 0.6, z), _mat("water"), false)
+	# Back-to-back labels: a double-sided one would read mirrored from behind.
+	for facing in [0.0, 180.0]:
+		var sign_label := _persian_label(tr("SQUARE_SIGN"), 220, Color(0.95, 0.95, 0.9))
+		sign_label.position = Vector3(0, 4.5, 78)
+		sign_label.rotation_degrees.y = facing
+		add_child(sign_label)
 
 func _build_blocks() -> void:
 	for side: int in [-1, 1]:
@@ -242,6 +255,17 @@ func _add_windows(face_x: float, z0: float, depth: float, floors: int, side: int
 			var key := "window" if _rng.randf() < 0.75 else "window_cold"
 			_box(Vector3(0.08, 1.4, 1.6), Vector3(face_x - side * 0.05, f * 3.2 + 1.8, z0 + 1.8 + c * 3.5), _mat(key), false)
 
+func _build_parked_cars() -> void:
+	# Paykans parked along both curbs, some gaps, slightly skewed like real parking.
+	for side: int in [-1, 1]:
+		var z := -78.0
+		while z < 74.0:
+			if _rng.randf() < 0.55:
+				var car := _box(Vector3(1.75, 1.45, 4.4), Vector3(side * 13.6, 0.72, z), _mat("truck"))
+				car.rotation_degrees.y = _rng.randf_range(-4.0, 4.0) + (180.0 if side < 0 else 0.0)
+				_dress(car, "paykan", Vector3.ZERO, 90.0)
+			z += _rng.randf_range(6.0, 11.0)
+
 func _build_station() -> void:
 	# The captured کلانتری closes the north end of the boulevard.
 	var z := -110.0
@@ -259,7 +283,7 @@ func _build_station() -> void:
 	# Militia checkpoint: sandbag walls and an armed pickup.
 	for x in [-8.0, -4.0, 4.0, 8.0]:
 		_dress(_box(Vector3(3.5, 1.1, 1.0), Vector3(x, 0.55, z + 20), _mat("sandbag")), "sandbag_wall")
-	_dress(_box(Vector3(2.0, 1.4, 4.8), Vector3(10, 0.9, z + 26), _mat("truck")), "pickup_armed", Vector3(2.0, 2.4, 4.8))
+	_dress(_box(Vector3(2.0, 1.4, 4.8), Vector3(10, 0.7, z + 26), _mat("truck")), "pickup_armed", Vector3(2.0, 2.6, 4.8), 90.0)
 	_dress(_box(Vector3(5.0, 1.0, 0.2), Vector3(0, 0.5, z + 30), _mat("curb"), false), "barrier")
 	_box(Vector3(0.15, 0.15, 1.6), Vector3(10, 2.1, z + 25), _mat("metal"), false)
 	var flood := SpotLight3D.new()
@@ -278,7 +302,7 @@ func _build_streetlights() -> void:
 	for z in range(-80, 80, 16):
 		for side: int in [-1, 1]:
 			var x: float = side * 15.6
-			_dress(_box(Vector3(0.18, 7.5, 0.18), Vector3(x, 3.75, z), _mat("metal")), "streetlight", Vector3(2.0, 7.8, 2.0))
+			_dress(_box(Vector3(0.18, 7.5, 0.18), Vector3(x, 3.75, z), _mat("metal")), "streetlight", Vector3(2.6, 8.2, 2.6), -90.0 * side)
 			_box(Vector3(1.6, 0.12, 0.3), Vector3(x - side * 0.7, 7.5, z), _mat("metal"), false)
 			var lamp := OmniLight3D.new()
 			lamp.light_color = SODIUM
@@ -304,7 +328,7 @@ func _persian_label(text: String, size: int, color: Color) -> Label3D:
 	l.modulate = color
 	l.outline_size = 0
 	l.shaded = false
-	l.double_sided = true
+	l.double_sided = false
 	return l
 
 # --- Actors ---------------------------------------------------------------

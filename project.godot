@@ -33,6 +33,12 @@ window/stretch/aspect="expand"
 
 theme/custom="res://assets/ui/theme.tres"
 
+[importer_defaults]
+
+scene={
+"gltf/embedded_image_handling": 2
+}
+
 [internationalization]
 
 locale/translations=PackedStringArray("res://localization/strings.fa.translation", "res://localization/strings.en.translation")
@@ -56,7 +62,6 @@ lights_and_shadows/positional_shadow/soft_shadow_filter_quality=5
 lights_and_shadows/positional_shadow/atlas_size=8192
 environment/ssao/quality=4
 environment/ssil/quality=4
-environment/screen_space_reflection/roughness_quality=3
 environment/volumetric_fog/volume_size=128
 environment/volumetric_fog/volume_depth=128
 global_illumination/sdfgi/probe_ray_count=5

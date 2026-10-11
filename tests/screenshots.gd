@@ -49,4 +49,18 @@ func _run() -> void:
 	player._yaw.look_at(Vector3(0, 5, -110))
 	player._pitch.rotation.x = 0.0
 	await _snap("05_station_checkpoint", 20)
+
+	# Face-on look at the volatile next to a parked Paykan.
+	player.global_position = Vector3(11.5, 0.2, 30)
+	player._yaw.global_position = player.global_position + Vector3.UP * 1.6
+	player._yaw.rotation = Vector3(0, PI, 0)
+	player._pitch.rotation.x = -0.12
+	await _snap("06_volatile_closeup", 20)
+
+	# Over the volatile's shoulder at the checkpoint guards.
+	player.global_position = Vector3(3, 0.2, -78)
+	player._yaw.global_position = player.global_position + Vector3.UP * 1.6
+	player._yaw.look_at(Vector3(0, 1.4, -92))
+	player._pitch.rotation.x = -0.05
+	await _snap("07_checkpoint_guards", 20)
 	quit()

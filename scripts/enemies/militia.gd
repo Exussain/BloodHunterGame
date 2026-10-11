@@ -21,6 +21,7 @@ var health := max_health
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _model: Node3D
 var _anim: AnimationPlayer
+var _hit_until := 0.0
 var _muzzle_light: OmniLight3D
 var _patrol_index := 0
 var _fire_timer := 0.0
@@ -103,6 +104,8 @@ func take_damage(amount: float, source: Node3D) -> void:
 		_go_down()
 	else:
 		_alert(source)
+		if GeneratedAssets.play(_anim, &"hit", 0.05, 1.3):
+			_hit_until = Time.get_ticks_msec() / 1000.0 + 0.5
 
 func take_pounce(source: Node3D) -> void:
 	if state in [State.PATROL, State.ALERT]:
@@ -117,12 +120,15 @@ func begin_feed(feeder: Node3D) -> void:
 func finish_feed() -> void:
 	state = State.DEAD
 	_spawn_blood(global_position + Vector3.UP * 0.3, 1.4)
-	_model.scale = Vector3(1, 0.6, 1)
+	if _anim == null:
+		_model.scale = Vector3(1, 0.6, 1)
 
 func _go_down() -> void:
 	state = State.DOWNED
 	velocity = Vector3.ZERO
 	_muzzle_light.light_energy = 0.0
+	if GeneratedAssets.play(_anim, &"down", 0.1):
+		return
 	var tw := create_tween()
 	tw.tween_property(_model, "rotation:x", -PI / 2, 0.35).set_ease(Tween.EASE_IN)
 	tw.parallel().tween_property(_model, "position:y", 0.38, 0.35)
@@ -167,8 +173,18 @@ func _physics_process(delta: float) -> void:
 			velocity.x = 0
 			velocity.z = 0
 	move_and_slide()
-	GeneratedAssets.drive_locomotion(_anim, Vector2(velocity.x, velocity.z).length(), walk_speed * 3.0)
+	_update_animation()
 	_muzzle_light.light_energy = maxf(_muzzle_light.light_energy - delta * 40.0, 0.0)
+
+func _update_animation() -> void:
+	if _anim == null or Time.get_ticks_msec() / 1000.0 < _hit_until:
+		return
+	match state:
+		State.PATROL:
+			var moving := Vector2(velocity.x, velocity.z).length() > 0.3
+			GeneratedAssets.play(_anim, &"patrol" if moving else &"idle", 0.3)
+		State.ALERT:
+			GeneratedAssets.play(_anim, &"combat", 0.2)
 
 func _patrol() -> void:
 	if patrol_points.is_empty():

@@ -3,17 +3,18 @@
   "style": {
     "character_sheet": "single full-body character, standing in A-pose, arms 30 degrees from body, facing camera, orthographic front view, entire body visible from head to feet, plain flat light-grey background, soft even studio lighting, no shadows on the ground, photorealistic, game-ready concept for 3D reconstruction",
     "prop_sheet": "single isolated object, three-quarter view from slightly above, entire object visible, plain flat light-grey background, soft even studio lighting, photorealistic, game-ready concept for 3D reconstruction",
-    "texture": "seamless tileable PBR albedo texture, perfectly flat orthographic top-down or straight-on view, even diffuse lighting, no perspective, no shadows, no objects in front, photorealistic, 4k detail"
+    "texture": "seamless tileable PBR albedo texture, perfectly flat orthographic top-down or straight-on view, even diffuse lighting, no perspective, no shadows, no objects in front, photorealistic, 4k detail, no text, no logos, no windows or doors"
   },
   "characters": [
     {
       "id": "volatile",
       "height_m": 2.0,
       "prompt": {
-        "subject": "gaunt infected predator creature that was once a tall Iranian man, grey-veined pale skin, elongated limbs and clawed fingers, glowing amber eyes, torn blood-soaked red tracksuit and red hoodie",
-        "mood": "feral, menacing, 18+ horror game protagonist",
+        "subject": "gaunt mutated humanoid creature that was once a tall Iranian man, pale grey skin with dark veins, long thin limbs, long clawed fingers, glowing amber eyes, wearing a torn dark red tracksuit and red hoodie stained with dark crimson",
+        "mood": "menacing horror video game creature, night predator",
         "identity": "fictional, not resembling any real person"
-      }
+      },
+      "actions": "volatile"
     },
     {
       "id": "militia_rifleman",
@@ -21,7 +22,8 @@
       "prompt": {
         "subject": "Iranian militia soldier, about 30, short dark beard, olive-green military uniform inspired by Iranian Revolutionary Guard style with invented shoulder patch, tactical vest, black boots, holding an AK-style rifle",
         "identity": "fictional, not resembling any real person, no real emblems or logos"
-      }
+      },
+      "actions": "militia"
     },
     {
       "id": "militia_officer",
@@ -29,7 +31,8 @@
       "prompt": {
         "subject": "Iranian militia officer, about 45, grey-streaked beard, darker olive uniform with invented rank insignia, beret, sidearm holster, radio on chest",
         "identity": "fictional, not resembling any real person, no real emblems or logos"
-      }
+      },
+      "actions": "militia"
     },
     {
       "id": "militia_plainclothes",
@@ -37,7 +40,8 @@
       "prompt": {
         "subject": "Iranian plainclothes militia fighter, about 25, black jacket over white shirt, dark trousers, green armband, holding a baton and pistol",
         "identity": "fictional, not resembling any real person, no real emblems or logos"
-      }
+      },
+      "actions": "militia"
     },
     {
       "id": "militia_heavy",
@@ -45,26 +49,95 @@
       "prompt": {
         "subject": "heavyset Iranian militia machine gunner, about 35, thick beard, olive camouflage uniform with invented patch, heavy body armor, helmet, belt-fed machine gun",
         "identity": "fictional, not resembling any real person, no real emblems or logos"
-      }
+      },
+      "actions": "militia"
     }
   ],
   "props": [
-    { "id": "pickup_armed", "prompt": "white Iranian Nissan Zamyad pickup truck with a mounted heavy machine gun on the bed, dirty and dented" },
-    { "id": "paykan", "prompt": "old white Iranian Paykan sedan car, worn paint, Tehran street car" },
-    { "id": "sandbag_wall", "prompt": "low curved wall of stacked military sandbags, about 3 meters long" },
-    { "id": "streetlight", "prompt": "tall Tehran sodium streetlight pole with single curved arm and orange lamp head" },
-    { "id": "water_tank", "prompt": "rooftop cylindrical metal water tank on a small steel stand, rusty, typical Tehran apartment roof" },
-    { "id": "ac_unit", "prompt": "rooftop evaporative air cooler unit (koolere abi), boxy grey metal, Tehran apartment" },
-    { "id": "barrier", "prompt": "red and white striped metal police checkpoint barrier" },
-    { "id": "pool_fountain", "prompt": "small rectangular stone fountain pool with low turquoise-tiled rim, Persian style, empty of people" }
+    {
+      "id": "pickup_armed",
+      "prompt": "white Iranian Nissan Zamyad pickup truck with a mounted heavy machine gun on the bed, dirty and dented"
+    },
+    {
+      "id": "paykan",
+      "prompt": "old white Iranian Paykan sedan car, worn paint, Tehran street car"
+    },
+    {
+      "id": "sandbag_wall",
+      "prompt": "low curved wall of stacked military sandbags, about 3 meters long"
+    },
+    {
+      "id": "streetlight",
+      "prompt": "tall Tehran sodium streetlight pole with single curved arm and orange lamp head"
+    },
+    {
+      "id": "water_tank",
+      "prompt": "rooftop cylindrical metal water tank on a small steel stand, rusty, typical Tehran apartment roof"
+    },
+    {
+      "id": "ac_unit",
+      "prompt": "rooftop evaporative air cooler unit (koolere abi), boxy grey metal, Tehran apartment"
+    },
+    {
+      "id": "barrier",
+      "prompt": "red and white striped metal road checkpoint boom barrier with a counterweight post, no text, no signs, no logos"
+    },
+    {
+      "id": "pool_fountain",
+      "prompt": "small rectangular stone fountain pool with low turquoise-tiled rim, Persian style, empty of people"
+    }
   ],
   "textures": [
-    { "id": "facade_brick", "prompt": "Tehran apartment building facade of light yellow-tan brick in Persian bond pattern, straight-on" },
-    { "id": "facade_stone", "prompt": "Tehran apartment facade of pale travertine stone slabs, straight-on" },
-    { "id": "facade_concrete", "prompt": "weathered grey concrete apartment wall with water stains, straight-on" },
-    { "id": "asphalt_wet", "prompt": "dark wet city asphalt road surface with small puddles and fine cracks, top-down" },
-    { "id": "sidewalk_tiles", "prompt": "Tehran sidewalk of grey and red square concrete paving tiles, worn, top-down" },
-    { "id": "pool_tiles", "prompt": "turquoise Persian ceramic pool tiles with thin white grout, top-down" },
-    { "id": "station_wall", "prompt": "police station wall of white-painted plaster over concrete, dirty, bullet marks, straight-on" }
-  ]
+    {
+      "id": "facade_brick",
+      "prompt": "Tehran apartment building facade of light yellow-tan brick in Persian bond pattern, straight-on"
+    },
+    {
+      "id": "facade_stone",
+      "prompt": "pale travertine stone slab cladding of a Tehran apartment wall, close-up, no windows, straight-on"
+    },
+    {
+      "id": "facade_concrete",
+      "prompt": "weathered grey concrete apartment wall with water stains, straight-on"
+    },
+    {
+      "id": "asphalt_wet",
+      "prompt": "dark wet city asphalt road surface with small puddles and fine cracks, top-down"
+    },
+    {
+      "id": "sidewalk_tiles",
+      "prompt": "Tehran sidewalk of grey and red square concrete paving tiles, worn, top-down"
+    },
+    {
+      "id": "pool_tiles",
+      "prompt": "turquoise Persian ceramic pool tiles with thin white grout, top-down"
+    },
+    {
+      "id": "station_wall",
+      "prompt": "dirty whitewashed plaster over concrete wall with a few bullet holes and grime streaks, no text, no signs, no logos, straight-on"
+    }
+  ],
+  "action_sets": {
+    "_comment": "Meshy animation library ids (GET /openapi/v1/animations/library). Keys are the names the game plays.",
+    "volatile": {
+      "idle": 336,
+      "run": 16,
+      "stalk": 616,
+      "climb": 444,
+      "wall_run": 445,
+      "pounce": 402,
+      "claw": 105,
+      "scream": 386,
+      "feed": 365,
+      "death": 366
+    },
+    "militia": {
+      "idle": 11,
+      "patrol": 341,
+      "combat": 234,
+      "hit": 177,
+      "down": 183,
+      "death": 189
+    }
+  }
 }

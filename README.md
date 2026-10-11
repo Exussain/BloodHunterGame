@@ -19,24 +19,24 @@ Controls: WASD move, Shift sprint, Space jump, left click claw, hold right click
 - Haft Hoz greybox: the seven pools, climbable apartment blocks, the militia-held کلانتری with a checkpoint.
 - Placeholder militia that patrol, spot you and shoot.
 
-## Real assets (ChatGPT image + Meshy)
+## Real assets (Meshy: GPT Image 2.5 + image-to-3D + rigging + animation)
 
-`tools/assets/generate.py` turns the JSON prompts in `tools/assets/manifest.json` into game assets:
+`tools/assets/generate.py` turns the JSON prompts in `tools/assets/manifest.json` into game assets, all through the Meshy API:
 
-- **Characters** (volatile + 4 militia types): image API concept sheet, Meshy image-to-3D, Meshy auto-rig with walk/run clips, saved to `assets/characters/<id>/`.
-- **Props** (armed pickup, Paykan, sandbags, streetlights, rooftop tanks and coolers, barrier): image, Meshy image-to-3D, saved to `assets/props/<id>/`.
-- **Textures** (brick, stone and concrete facades, wet asphalt, sidewalk, pool tiles, station wall): image only, saved to `assets/textures/`.
+- **Characters** (volatile + 4 militia types): GPT Image 2.5 concept in A-pose, image-to-3D, auto-rig, then a preset animation set (volatile: idle, run, stalk, climb, wall-run, pounce, claw, scream, feed, death; militia: idle, patrol, combat, hit, down, death). Saved to `assets/characters/<id>/`.
+- **Props** (armed Zamyad pickup, Paykan, sandbags, streetlight, rooftop tank and cooler, checkpoint barrier, tiled pool): concept, image-to-3D, saved to `assets/props/<id>/`.
+- **Textures** (brick, stone and concrete facades, wet asphalt, sidewalk, pool tiles, station wall): image only, then made seamless. Saved to `assets/textures/`.
 
-The game swaps each greybox for its generated asset automatically when the file exists. Nothing else to wire up.
+Concept art goes to `tools/assets/concepts/`. Models are shrunk about 8x with `gltf-transform` (1K WebP textures) when it's installed. Finished Meshy task ids are cached in `tools/assets/state.json`, so re-runs never pay twice, and failed tasks (refunded by Meshy) are retried automatically. The game swaps each greybox for its generated asset when the file exists.
 
 ```
-export IMAGE_API_KEY=...          # OpenAI-compatible key (or OPENAI_API_KEY)
-export IMAGE_API_BASE=https://ai.nubixshop.ir/v1   # default
-export IMAGE_MODEL=gpt-image-1    # default
+npm i -g @gltf-transform/cli      # optional, shrinks models
+pip install numpy pillow          # optional, seamless textures
 export MESHY_API_KEY=...
-python3 tools/assets/generate.py --dry-run     # see every prompt first
-python3 tools/assets/generate.py --kind textures
-python3 tools/assets/generate.py               # everything still missing
+python3 tools/assets/generate.py --dry-run          # see every prompt
+python3 tools/assets/generate.py --stage image      # concepts only, review before paying for 3D
+python3 tools/assets/generate.py                    # everything still missing
+python3 tools/assets/generate.py --only volatile --force   # redo one asset
 ```
 
 Then open the project in Godot so it imports the new files.
@@ -49,8 +49,10 @@ godot --headless -s res://tests/test_gameplay.gd
 godot -s res://tests/screenshots.gd -- <output_dir>   # needs a GPU
 ```
 
-## Screenshots (greybox)
+## Screenshots
 
+![The volatile next to a parked Paykan](docs/screens/06_volatile_closeup.jpg)
+![Haft Hoz boulevard toward the captured station](docs/screens/05_station_checkpoint.jpg)
+![Approaching the checkpoint](docs/screens/07_checkpoint_guards.jpg)
+![Rooftop over the seven pools](docs/screens/04_rooftop_boulevard.jpg)
 ![Age gate](docs/screens/01_age_gate.png)
-![Rooftop over the seven pools](docs/screens/04_rooftop_boulevard.png)
-![The captured station](docs/screens/05_station_checkpoint.png)

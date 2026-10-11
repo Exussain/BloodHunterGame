@@ -44,6 +44,8 @@ var _pitch: Node3D
 var _camera: Camera3D
 var _model: Node3D
 var _anim: AnimationPlayer
+## Until this time (s), a one-shot clip (claw) owns the animation.
+var _oneshot_until := 0.0
 var _wall_ray: RayCast3D
 var _ledge_ray: RayCast3D
 var _left_ray: RayCast3D
@@ -137,6 +139,15 @@ func _build_camera() -> void:
 	_camera.far = 800.0
 	arm.add_child(_camera)
 	_camera.make_current()
+	# Soft fill light that travels with the camera so the volatile never turns into a silhouette.
+	var fill := OmniLight3D.new()
+	fill.light_color = Color(1.0, 0.85, 0.75)
+	fill.light_energy = 0.6
+	fill.omni_range = 6.0
+	fill.light_specular = 0.2
+	fill.shadow_enabled = false
+	fill.position = Vector3(0, 0.3, 0)
+	_camera.add_child(fill)
 
 func _build_rays() -> void:
 	_wall_ray = _ray(Vector3(0, 1.2, 0), Vector3(0, 0, -0.9))
@@ -180,7 +191,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_update_model_facing(delta)
-	GeneratedAssets.drive_locomotion(_anim, Vector2(velocity.x, velocity.z).length(), sprint_speed)
+	_update_animation()
 
 	if state in [State.GROUND, State.AIR]:
 		state = State.GROUND if is_on_floor() else State.AIR
@@ -333,6 +344,7 @@ func _claw() -> void:
 	if _claw_cooldown > 0:
 		return
 	_claw_cooldown = 0.45
+	_play_oneshot(&"claw", 0.5)
 	var forward := -_model.global_basis.z
 	for enemy in _enemies_in_range(claw_range, false):
 		var to: Vector3 = enemy.global_position - global_position
@@ -393,6 +405,7 @@ func take_damage(amount: float) -> void:
 	health = maxf(health - amount, 0.0)
 	health_changed.emit(health, MAX_HEALTH)
 	if health <= 0:
+		GeneratedAssets.play(_anim, &"death", 0.1)
 		died.emit()
 
 func add_mutation(amount: float) -> void:
@@ -413,6 +426,38 @@ func _enemies_in_range(radius: float, downed: bool) -> Array:
 	result.sort_custom(func(a, b) -> bool:
 		return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
 	return result
+
+func _update_animation() -> void:
+	if _anim == null or health <= 0:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < _oneshot_until and state in [State.GROUND, State.AIR]:
+		return
+	var speed := Vector2(velocity.x, velocity.z).length()
+	match state:
+		State.FEED:
+			GeneratedAssets.play(_anim, &"feed")
+		State.CLIMB:
+			# Freeze the climb cycle when hanging still on the wall.
+			GeneratedAssets.play(_anim, &"climb", 0.15, clampf(absf(velocity.y) / climb_speed, 0.0, 1.5))
+		State.WALL_RUN:
+			GeneratedAssets.play(_anim, &"wall_run", 0.1)
+		State.POUNCE:
+			GeneratedAssets.play(_anim, &"pounce", 0.1)
+		State.AIR:
+			if velocity.y < -2.0:
+				GeneratedAssets.play(_anim, &"pounce", 0.2)
+		_:
+			if speed > sprint_speed * 0.7:
+				GeneratedAssets.play(_anim, &"run", 0.2, speed / sprint_speed)
+			elif speed > 0.5:
+				GeneratedAssets.play(_anim, &"stalk", 0.2, clampf(speed / walk_speed, 0.6, 1.4))
+			else:
+				GeneratedAssets.play(_anim, &"idle", 0.3)
+
+func _play_oneshot(clip: StringName, seconds: float) -> void:
+	if GeneratedAssets.play(_anim, clip, 0.08, 1.6):
+		_oneshot_until = Time.get_ticks_msec() / 1000.0 + seconds
 
 func _update_model_facing(delta: float) -> void:
 	var face := Vector3.ZERO

@@ -1,0 +1,8 @@
+{
+  "idle": "Idle_02",
+  "patrol": "Walk_Slowly_and_Look_Around",
+  "combat": "Walk_Forward_While_Shooting",
+  "hit": "Gunshot_Reaction",
+  "down": "Shot_and_Fall_Backward",
+  "death": "dying_backwards"
+}

@@ -17,29 +17,70 @@ static func character(id: String) -> Node3D:
 	_add_clips(model, id)
 	return model
 
-## Copies Meshy's walking/running clips into the model's AnimationPlayer as
-## "walk" and "run", so callers can just play those names.
+const LOOPING := [&"idle", &"run", &"stalk", &"climb", &"wall_run", &"patrol", &"combat"]
+## Clips whose travel the game already moves the body for; their hip drift is removed
+## so the mesh doesn't run ahead of the collider and snap back each loop.
+const IN_PLACE := [&"run", &"stalk", &"climb", &"wall_run", &"pounce", &"claw", &"patrol", &"combat"]
+
+## Loads the Meshy action clips from animations.glb into the model's AnimationPlayer
+## under the game's names (idle, run, claw, ...), as mapped in animations.json.
 static func _add_clips(model: Node3D, id: String) -> void:
 	var player := find_animation_player(model)
-	if player == null:
+	var map_path := CHAR_DIR % id + "animations.json"
+	var anim_path := CHAR_DIR % id + "animations.glb"
+	if player == null or not FileAccess.file_exists(map_path) or not ResourceLoader.exists(anim_path):
 		return
-	var lib: AnimationLibrary
-	if player.has_animation_library(&""):
-		lib = player.get_animation_library(&"")
-	else:
-		lib = AnimationLibrary.new()
-		player.add_animation_library(&"", lib)
-	for clip in [["walking", &"walk"], ["running", &"run"]]:
-		var path: String = CHAR_DIR % id + clip[0] + ".glb"
-		if not ResourceLoader.exists(path):
+	var mapping: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(map_path))
+	var lib := AnimationLibrary.new()
+	var src: Node = load(anim_path).instantiate()
+	var src_player := find_animation_player(src)
+	if src_player:
+		for game_name: String in mapping:
+			var clip := _match_clip(src_player, mapping[game_name])
+			if clip == &"":
+				push_warning("%s: no clip for %s (%s)" % [id, game_name, mapping[game_name]])
+				continue
+			var anim: Animation = src_player.get_animation(clip).duplicate()
+			anim.loop_mode = Animation.LOOP_LINEAR if StringName(game_name) in LOOPING else Animation.LOOP_NONE
+			if StringName(game_name) in IN_PLACE:
+				_remove_root_drift(anim)
+			lib.add_animation(game_name, anim)
+	src.free()
+	if player.has_animation_library(&"game"):
+		player.remove_animation_library(&"game")
+	player.add_animation_library(&"game", lib)
+
+static func _remove_root_drift(anim: Animation) -> void:
+	for t in anim.get_track_count():
+		if anim.track_get_type(t) != Animation.TYPE_POSITION_3D or not String(anim.track_get_path(t)).ends_with(":Hips"):
 			continue
-		var src: Node = load(path).instantiate()
-		var src_player := find_animation_player(src)
-		if src_player and not src_player.get_animation_list().is_empty():
-			var anim: Animation = src_player.get_animation(src_player.get_animation_list()[0]).duplicate()
-			anim.loop_mode = Animation.LOOP_LINEAR
-			lib.add_animation(clip[1], anim)
-		src.free()
+		var count := anim.track_get_key_count(t)
+		if count < 2:
+			return
+		var start: Vector3 = anim.track_get_key_value(t, 0)
+		var drift: Vector3 = anim.track_get_key_value(t, count - 1) - start
+		var length := maxf(anim.track_get_key_time(t, count - 1), 0.001)
+		for k in count:
+			# Subtract the straight-line travel, keeping the bob and sway around it.
+			var v: Vector3 = anim.track_get_key_value(t, k)
+			anim.track_set_key_value(t, k, v - drift * (anim.track_get_key_time(t, k) / length))
+		return
+
+## Meshy renames clips on export ("Run Fast" -> "RunFast", "..._inplace"), so match loosely.
+static func _match_clip(player: AnimationPlayer, library_name: String) -> StringName:
+	var want := _norm(library_name)
+	for clip in player.get_animation_list():
+		var have := _norm(clip)
+		if have.contains(want) or (have != "" and want.contains(have)):
+			return clip
+	return &""
+
+static func _norm(s: String) -> String:
+	var out := ""
+	for ch in s.to_lower():
+		if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9"):
+			out += ch
+	return out
 
 static func find_animation_player(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -50,21 +91,22 @@ static func find_animation_player(node: Node) -> AnimationPlayer:
 			return found
 	return null
 
-## Plays walk/run/idle on a generated character from its horizontal speed.
-static func drive_locomotion(player: AnimationPlayer, speed: float, run_speed: float) -> void:
+## Plays one of the game-named clips ("idle", "run", ...) if the character has it.
+## Returns false when it doesn't, so callers can fall back.
+static func play(player: AnimationPlayer, clip: StringName, blend := 0.2, speed := 1.0) -> bool:
 	if player == null:
-		return
-	var want: StringName = &""
-	if speed > run_speed * 0.7 and player.has_animation(&"run"):
-		want = &"run"
-	elif speed > 0.5 and player.has_animation(&"walk"):
-		want = &"walk"
-	if want == &"":
-		if player.is_playing() and player.current_animation in [&"walk", &"run"]:
-			player.pause()
-		return
-	if player.current_animation != want or not player.is_playing():
-		player.play(want, 0.2)
+		return false
+	var full := StringName("game/" + clip)
+	if not player.has_animation(full):
+		return false
+	if player.current_animation != full or not player.is_playing():
+		player.play(full, blend, speed)
+	else:
+		player.speed_scale = speed
+	return true
+
+static func has_clip(player: AnimationPlayer, clip: StringName) -> bool:
+	return player != null and player.has_animation(StringName("game/" + clip))
 
 static func prop(id: String) -> Node3D:
 	var path := PROP_PATH % id

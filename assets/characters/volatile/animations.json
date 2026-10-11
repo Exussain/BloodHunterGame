@@ -1,0 +1,12 @@
+{
+  "idle": "Long_Breathe_and_Look_Around",
+  "run": "RunFast",
+  "stalk": "Cautious_Crouch_Walk_Forward_inplace",
+  "climb": "climbing_up_wall",
+  "wall_run": "diagonal_wall_run",
+  "pounce": "Run_and_Leap",
+  "claw": "Triple_Combo_Attack",
+  "scream": "Zombie_Scream",
+  "feed": "Kneel_on_One_Knee_and_Stand",
+  "death": "falling_down"
+}

@@ -2,3 +2,5 @@
 *.translation
 /build/
 /export/
+tools/assets/raw/
+__pycache__/
