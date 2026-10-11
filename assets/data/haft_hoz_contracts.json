@@ -1,0 +1,21 @@
+{
+	"night": {
+		"start_minutes": 1380,
+		"dawn_minutes": 1770,
+		"length_seconds": 900.0,
+		"warning_minutes_left": 30
+	},
+	"alarm": {
+		"lose_track_time": 10.0,
+		"reinforce_after": 25.0,
+		"reinforce_waves": 2,
+		"reinforce_count": 2,
+		"heartbeat_range": 18.0
+	},
+	"contracts": [
+		{"id": "lookouts", "tag": "lookout", "goal": "down", "brief": "BRIEF_LOOKOUTS", "objective": "OBJ_LOOKOUTS"},
+		{"id": "officer", "tag": "officer", "goal": "feed", "brief": "BRIEF_OFFICER", "objective": "OBJ_OFFICER"},
+		{"id": "station", "tag": "station", "goal": "down", "brief": "BRIEF_STATION", "objective": "OBJ_STATION"}
+	],
+	"outro": "BRIEF_DONE"
+}
