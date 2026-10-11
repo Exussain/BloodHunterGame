@@ -379,7 +379,7 @@ def make_window_emission(glb, dest):
     warm_lit = (value > 0.8) & (sat > 0.3) & (rgb[..., 0] > rgb[..., 2])
     mask = Image.fromarray(((dark | bluish | warm_lit) * 255).astype(np.uint8))
     # An opening drops thin dark lines (railings, cracks, seams) and keeps the panes.
-    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.8))
+    mask = mask.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(0.8))
     mask.save(dest, optimize=True)
     log(f"    window mask -> {dest.relative_to(ROOT)} ({np.asarray(mask).mean() / 2.55:.1f}% glass)")
 

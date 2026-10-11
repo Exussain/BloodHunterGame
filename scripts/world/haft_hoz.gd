@@ -316,8 +316,8 @@ func _build_parked_cars() -> void:
 				_dress(car, "paykan", Vector3.ZERO, 90.0)
 			z += _rng.randf_range(6.0, 11.0)
 
-const STATION_HEIGHT := 12.0
-const STATION_SIGN_HEIGHT := 7.2
+const STATION_HEIGHT := 16.0
+const STATION_SIGN_HEIGHT := 5.2
 
 func _build_station() -> void:
 	# The captured کلانتری closes the north end of the boulevard.

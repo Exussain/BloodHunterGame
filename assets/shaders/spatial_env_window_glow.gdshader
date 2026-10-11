@@ -14,6 +14,7 @@ uniform vec3 cold : source_color = vec3(0.65, 0.8, 1.0);
 uniform float energy = 2.0;
 
 varying vec3 world_pos;
+varying vec3 world_normal;
 
 float hash(vec3 p) {
 	p = fract(p * 0.3183099 + 0.1);
@@ -23,10 +24,13 @@ float hash(vec3 p) {
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 void fragment() {
-	float glass = texture(glass_mask, UV).r;
+	// Soft edges only; flat roofs and ledges are never windows.
+	float glass = smoothstep(0.45, 0.8, texture(glass_mask, UV).r);
+	glass *= 1.0 - smoothstep(0.25, 0.45, abs(world_normal.y));
 	vec3 cell = floor(world_pos / cell_size);
 	float h = hash(cell);
 	float lit = step(h, lit_fraction);
