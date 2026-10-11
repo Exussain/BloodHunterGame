@@ -2,51 +2,91 @@ class_name PowerFx
 ## Visual effects for the volatile's powers: the tendril and the scream shockwave.
 ## Placeholder geometry with emissive materials until real VFX are made.
 
-## A sinewy tendril stretched from the volatile's chest to a grabbed soldier.
-## It follows both every frame and removes itself once the soldier lands.
+## A sinewy tendril from the volatile's chest to a grabbed soldier: a tapering tube
+## that arcs, coils and writhes along its length. Rebuilt every frame in world space;
+## it removes itself once the soldier lands.
 class Tendril extends MeshInstance3D:
+	const SEGMENTS := 40
+	const SIDES := 10
 	var source: Node3D
 	var target: Militia
+	var _im := ImmediateMesh.new()
+	var _age := 0.0
+	var _seed := randf() * TAU
 
 	func _ready() -> void:
 		top_level = true
-		var tube := CylinderMesh.new()
-		tube.top_radius = 0.06
-		tube.bottom_radius = 0.13
-		tube.height = 1.0
-		tube.radial_segments = 8
-		tube.rings = 1
-		mesh = tube
+		global_transform = Transform3D.IDENTITY
+		mesh = _im
 		var m := StandardMaterial3D.new()
 		# Wet, dark flesh with a faint inner glow, so it reads at night without looking like a laser.
-		m.albedo_color = Color(0.32, 0.03, 0.04)
-		m.roughness = 0.2
+		m.albedo_color = Color(0.3, 0.03, 0.04)
+		m.roughness = 0.18
 		m.metallic_specular = 0.9
 		m.rim_enabled = true
-		m.rim = 0.6
+		m.rim = 0.5
 		m.emission_enabled = true
-		m.emission = Color(0.7, 0.05, 0.04)
-		m.emission_energy_multiplier = 0.45
+		m.emission = Color(0.65, 0.04, 0.03)
+		m.emission_energy_multiplier = 0.4
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		material_override = m
 		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	func _process(_delta: float) -> void:
+	func _process(delta: float) -> void:
 		if not is_instance_valid(source) or not is_instance_valid(target) or not target.is_grabbed():
 			queue_free()
 			return
+		_age += delta
 		var a := source.global_position + Vector3.UP * 1.35
 		var b := target.grab_point()
-		var length := a.distance_to(b)
-		if length < 0.05:
+		if a.distance_to(b) < 0.05:
 			return
-		var dir := (b - a) / length
-		# Cylinders run along Y: build a basis whose Y is the tendril direction.
-		var side := dir.cross(Vector3.UP)
-		if side.length() < 0.01:
-			side = Vector3.RIGHT
-		side = side.normalized()
-		# The Y column carries the length, stretching the unit cylinder end to end.
-		global_transform = Transform3D(Basis(side, dir * length, side.cross(dir)), (a + b) * 0.5)
+		_build(a, b)
+
+	## Point along the tendril at t (0 = chest, 1 = soldier).
+	func _point(a: Vector3, b: Vector3, t: float) -> Vector3:
+		var length := a.distance_to(b)
+		var axis := (b - a) / length
+		var n1 := axis.cross(Vector3.UP)
+		n1 = n1.normalized() if n1.length() > 0.01 else Vector3.RIGHT
+		var n2 := n1.cross(axis)
+		# Arc up like a thrown whip, then coil around that arc; the coil travels
+		# toward the soldier and settles as the pull tightens.
+		var sag := sin(t * PI) * length * 0.08
+		var coil_amp := sin(t * PI) * minf(length * 0.015, 0.16) * (1.0 + 0.6 / (1.0 + _age * 6.0))
+		var phase := t * 2.0 * TAU - _age * 12.0 + _seed
+		return a.lerp(b, t) + n2 * sag + (n1 * cos(phase) + n2 * sin(phase)) * coil_amp
+
+	func _build(a: Vector3, b: Vector3) -> void:
+		var rings: Array[PackedVector3Array] = []
+		var normals: Array[PackedVector3Array] = []
+		for i in SEGMENTS + 1:
+			var t := float(i) / SEGMENTS
+			var p := _point(a, b, t)
+			var tangent := (_point(a, b, minf(t + 0.01, 1.0)) - _point(a, b, maxf(t - 0.01, 0.0))).normalized()
+			var u := tangent.cross(Vector3.UP)
+			u = u.normalized() if u.length() > 0.01 else Vector3.RIGHT
+			var v := u.cross(tangent)
+			# Thick at the chest, thin at the hook, with a pulse of muscle running down it.
+			var radius := lerpf(0.12, 0.04, t) * (1.0 + 0.25 * sin(t * 18.0 - _age * 20.0))
+			var ring := PackedVector3Array()
+			var ring_n := PackedVector3Array()
+			for j in SIDES:
+				var ang := TAU * j / SIDES
+				var n := u * cos(ang) + v * sin(ang)
+				ring.append(p + n * radius)
+				ring_n.append(n)
+			rings.append(ring)
+			normals.append(ring_n)
+		_im.clear_surfaces()
+		_im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+		for i in SEGMENTS:
+			for j in SIDES:
+				var k := (j + 1) % SIDES
+				for idx: Vector2i in [Vector2i(i, j), Vector2i(i + 1, j), Vector2i(i + 1, k), Vector2i(i, j), Vector2i(i + 1, k), Vector2i(i, k)]:
+					_im.surface_set_normal(normals[idx.x][idx.y])
+					_im.surface_add_vertex(rings[idx.x][idx.y])
+		_im.surface_end()
 
 static func tendril(parent: Node, source: Node3D, target: Militia) -> void:
 	var t := Tendril.new()

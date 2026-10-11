@@ -1,9 +1,11 @@
 extends SceneTree
 ## Renders evidence screenshots of the volatile's powers (needs a GPU or software Vulkan):
-##   godot -s res://tests/power_screens.gd -- <output_dir>
+##   godot -s res://tests/power_screens.gd -- <output_dir> [tendril]
+## Passing "tendril" renders only the tendril shot.
 ## Each shot runs the power, lets it play for a moment, then freezes time to capture it.
 
 var _out := "user://power_screens"
+var _only_tendril := false
 var _level: Node
 var _player: Volatile
 
@@ -11,6 +13,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if not args.is_empty():
 		_out = args[0]
+	_only_tendril = args.size() > 1 and args[1] == "tendril"
 	DirAccess.make_dir_recursive_absolute(_out)
 	_run.call_deferred()
 
@@ -75,6 +78,9 @@ func _run() -> void:
 	print("tendril grabbed: ", _player.use_tendril())
 	await _physics(9)
 	await _snap("01_tendril_grab")
+	if _only_tendril:
+		quit()
+		return
 	await _physics(80)
 
 	# 2. Scream: a squad of three on the lane ahead.
