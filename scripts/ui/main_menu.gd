@@ -14,7 +14,11 @@ func _ready() -> void:
 	col.add_child(start)
 
 	var row := HBoxContainer.new()
-	row.add_child(UiUtil.label(tr("MENU_GRAPHICS"), 32))
+	row.add_theme_constant_override("separation", 24)
+	var graphics := UiUtil.label(tr("MENU_GRAPHICS"), 32)
+	# A wrapping label in an HBox shrinks to one letter per line; keep it on one line.
+	graphics.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(graphics)
 	var quality := OptionButton.new()
 	quality.add_theme_font_size_override("font_size", 30)
 	quality.size_flags_horizontal = Control.SIZE_EXPAND_FILL
