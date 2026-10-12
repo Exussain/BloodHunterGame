@@ -21,6 +21,10 @@ const LOOPING := [&"idle", &"run", &"stalk", &"climb", &"wall_run", &"patrol", &
 ## Clips whose travel the game already moves the body for; their hip drift is removed
 ## so the mesh doesn't run ahead of the collider and snap back each loop.
 const IN_PLACE := [&"run", &"stalk", &"climb", &"wall_run", &"pounce", &"claw", &"patrol", &"combat"]
+## One-shots that restart while already playing (combo hits, back-to-back leaps). Each
+## also gets a "<name>_b" copy so play_at() can cross-fade from one take to the next.
+const ALIASED := [&"claw", &"pounce", &"scream"]
+const ALIAS_SUFFIX := "_b"
 
 ## Loads the Meshy action clips from animations.glb into the model's AnimationPlayer
 ## under the game's names (idle, run, claw, ...), as mapped in animations.json.
@@ -92,18 +96,55 @@ static func find_animation_player(node: Node) -> AnimationPlayer:
 	return null
 
 ## Plays one of the game-named clips ("idle", "run", ...) if the character has it.
-## Returns false when it doesn't, so callers can fall back.
+## Returns false when it doesn't, so callers can fall back. Calling it again for the
+## clip that is already playing only changes its speed, so it can be called every frame.
+## The speed lives in the player's speed_scale (never the per-play custom speed, which
+## would multiply with it and freeze a clip started at speed 0), and the cross-fade is
+## scaled so it lasts `blend` real seconds at that speed. Callers that change the rate
+## while a cross-fade runs should pass blend 0 and fade the pose themselves (see
+## Volatile.PoseFader), since AnimationPlayer advances its fades by speed_scale.
 static func play(player: AnimationPlayer, clip: StringName, blend := 0.2, speed := 1.0) -> bool:
 	if player == null:
 		return false
 	var full := StringName("game/" + clip)
 	if not player.has_animation(full):
 		return false
+	player.speed_scale = speed
 	if player.current_animation != full or not player.is_playing():
-		player.play(full, blend, speed)
-	else:
-		player.speed_scale = speed
+		player.play(full, _scaled_blend(blend, speed), 1.0)
 	return true
+
+## Like play(), but always (re)starts the clip `from` seconds in, cross-fading from
+## whatever was showing. Used for one-shots and for clips whose useful part starts late
+## (the leap inside Run_and_Leap, the second hit of a combo).
+static func play_at(player: AnimationPlayer, clip: StringName, from: float, blend := 0.1, speed := 1.0) -> bool:
+	if player == null:
+		return false
+	var full := StringName("game/" + clip)
+	if not player.has_animation(full):
+		return false
+	player.speed_scale = speed
+	if player.current_animation == full and player.is_playing():
+		# Restarting the same clip can't cross-fade with itself; use its alias if there is one.
+		var alt := StringName(String(full) + ALIAS_SUFFIX)
+		if player.has_animation(alt):
+			full = alt
+	player.play(full, _scaled_blend(blend, speed), 1.0)
+	player.seek(from, true)
+	return true
+
+## The name (without "game/") of the clip showing now, with any alias suffix removed;
+## "" when nothing is playing.
+static func current_clip(player: AnimationPlayer) -> StringName:
+	if player == null or not player.is_playing():
+		return &""
+	return StringName(String(player.current_animation).trim_prefix("game/").trim_suffix(ALIAS_SUFFIX))
+
+## AnimationPlayer advances cross-fades by speed_scale * delta, so a fade started at
+## a high or low clip rate would finish early or late; this keeps it in real seconds
+## (for a rate that holds steady during the fade).
+static func _scaled_blend(blend: float, speed: float) -> float:
+	return blend * maxf(absf(speed), 0.05) if blend > 0.0 else 0.0
 
 static func has_clip(player: AnimationPlayer, clip: StringName) -> bool:
 	return player != null and player.has_animation(StringName("game/" + clip))

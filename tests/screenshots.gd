@@ -1,17 +1,29 @@
 extends SceneTree
 ## Renders reference screenshots (needs a GPU or software Vulkan, not --headless):
-##   godot -s res://tests/screenshots.gd -- <output_dir>
+##   godot -s res://tests/screenshots.gd -- <output_dir> [shots]
+## `shots` is an optional comma list of shot numbers (e.g. "04,06") to render only
+## those; the level loads once either way, and the menus are skipped when it is given.
 
 var _out := "user://screens"
+## Shot number prefixes to render; empty renders every shot.
+var _only: PackedStringArray = []
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if not args.is_empty():
 		_out = args[0]
+	if args.size() > 1:
+		_only = args[1].split(",", false)
 	DirAccess.make_dir_recursive_absolute(_out)
 	_run.call_deferred()
 
+## True when `name` was asked for (or no filter was given).
+func _wanted(name: String) -> bool:
+	return _only.is_empty() or _only.has(name.left(2))
+
 func _snap(name: String, frames := 30) -> void:
+	if not _wanted(name):
+		return
 	for i in frames:
 		await process_frame
 	await RenderingServer.frame_post_draw
@@ -19,6 +31,9 @@ func _snap(name: String, frames := 30) -> void:
 	print("saved ", name)
 
 func _run() -> void:
+	if not _only.is_empty():
+		await _run_level()
+		return
 	var gate: Node = load("res://scenes/ui/age_gate.tscn").instantiate()
 	# Show the gate even if this machine already confirmed.
 	root.get_node("Settings").age_confirmed = false
@@ -29,7 +44,9 @@ func _run() -> void:
 	root.add_child(menu)
 	await _snap("02_main_menu", 5)
 	menu.queue_free()
+	await _run_level()
 
+func _run_level() -> void:
 	var level: Node = load("res://scenes/world/haft_hoz.tscn").instantiate()
 	root.add_child(level)
 	var player: Volatile = get_first_node_in_group(&"player")

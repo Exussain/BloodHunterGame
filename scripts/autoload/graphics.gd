@@ -16,6 +16,10 @@ const PRESETS := {
 		"shadow_dir": 8192, "shadow_pos": 8192,
 		"shadow_filter": RenderingServer.SHADOW_QUALITY_SOFT_ULTRA,
 		"scale": 0.77, "fsr": true, "taa": true, "msaa": Viewport.MSAA_DISABLED,
+		"ssr_half": false,
+		"sdfgi_converge": RenderingServer.ENV_SDFGI_CONVERGE_IN_30_FRAMES,
+		"sdfgi_light": RenderingServer.ENV_SDFGI_UPDATE_LIGHT_IN_4_FRAMES,
+		"fog_filter": true, "glow_bicubic": true,
 		"glow": true, "aniso": Viewport.ANISOTROPY_16X,
 	},
 	Preset.HIGH: {
@@ -27,6 +31,10 @@ const PRESETS := {
 		"shadow_dir": 4096, "shadow_pos": 4096,
 		"shadow_filter": RenderingServer.SHADOW_QUALITY_SOFT_HIGH,
 		"scale": 0.67, "fsr": true, "taa": true, "msaa": Viewport.MSAA_DISABLED,
+		"ssr_half": true,
+		"sdfgi_converge": RenderingServer.ENV_SDFGI_CONVERGE_IN_20_FRAMES,
+		"sdfgi_light": RenderingServer.ENV_SDFGI_UPDATE_LIGHT_IN_8_FRAMES,
+		"fog_filter": true, "glow_bicubic": true,
 		"glow": true, "aniso": Viewport.ANISOTROPY_8X,
 	},
 	Preset.MEDIUM: {
@@ -38,6 +46,10 @@ const PRESETS := {
 		"shadow_dir": 4096, "shadow_pos": 2048,
 		"shadow_filter": RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM,
 		"scale": 0.59, "fsr": true, "taa": true, "msaa": Viewport.MSAA_DISABLED,
+		"ssr_half": true,
+		"sdfgi_converge": RenderingServer.ENV_SDFGI_CONVERGE_IN_15_FRAMES,
+		"sdfgi_light": RenderingServer.ENV_SDFGI_UPDATE_LIGHT_IN_16_FRAMES,
+		"fog_filter": true, "glow_bicubic": false,
 		"glow": true, "aniso": Viewport.ANISOTROPY_4X,
 	},
 	Preset.LOW: {
@@ -49,6 +61,10 @@ const PRESETS := {
 		"shadow_dir": 2048, "shadow_pos": 1024,
 		"shadow_filter": RenderingServer.SHADOW_QUALITY_SOFT_LOW,
 		"scale": 1.0, "fsr": false, "taa": false, "msaa": Viewport.MSAA_2X,
+		"ssr_half": true,
+		"sdfgi_converge": RenderingServer.ENV_SDFGI_CONVERGE_IN_15_FRAMES,
+		"sdfgi_light": RenderingServer.ENV_SDFGI_UPDATE_LIGHT_IN_16_FRAMES,
+		"fog_filter": false, "glow_bicubic": false,
 		"glow": false, "aniso": Viewport.ANISOTROPY_2X,
 	},
 }
@@ -72,6 +88,15 @@ func apply(viewport: Viewport, env: Environment = null) -> void:
 	RenderingServer.environment_set_ssil_quality(p.ssil_quality, false, 0.5, 4, 50.0, 300.0)
 	RenderingServer.environment_set_sdfgi_ray_count(p.sdfgi_rays)
 	RenderingServer.environment_set_volumetric_fog_volume_size(p.fog_size, p.fog_depth)
+	# Blurred froxels: smooth light shafts instead of stair-stepped fog slices.
+	RenderingServer.environment_set_volumetric_fog_filter_active(p.fog_filter)
+	# Full-res SSR on Ultra keeps puddle reflections sharp (4.6's SSR handles
+	# roughness itself; the old roughness-quality knob is a deprecated no-op).
+	RenderingServer.environment_set_ssr_half_size(p.ssr_half)
+	RenderingServer.environment_set_sdfgi_frames_to_converge(p.sdfgi_converge)
+	RenderingServer.environment_set_sdfgi_frames_to_update_light(p.sdfgi_light)
+	# Smoother halos around lamps and windows from the wide glow levels.
+	RenderingServer.environment_glow_set_use_bicubic_upscale(p.glow_bicubic)
 
 	if env == null:
 		return

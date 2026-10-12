@@ -2,7 +2,12 @@ class_name Militia
 extends CharacterBody3D
 ## Placeholder traitor militia soldier: patrols, spots the volatile, shoots.
 ## The volatile's powers can grab (tendril), stun and panic (scream, rage) it.
+## Going down (claw, pounce, tendril landing) throws it into a physics ragdoll
+## (see scripts/world/ragdoll.gd) that settles, freezes and stays in the world to be fed on.
 ## Full AI (cover, flanking, alarms) and gore come in later build steps.
+
+const RagdollScript := preload("res://scripts/world/ragdoll.gd")
+const BloodPool := preload("res://scripts/enemies/blood_pool.gd")
 
 enum State { PATROL, ALERT, DOWNED, FED_ON, DEAD, GRABBED, STUNNED, PANIC }
 
@@ -40,6 +45,12 @@ var _stun_left := 0.0
 var _panic_left := 0.0
 var _panic_speed := 4.6
 var _saved_layers := Vector2i.ZERO
+## Where the grabbed body was last frame, to carry its momentum into the ragdoll.
+var _grab_prev := Vector3.ZERO
+var _grab_velocity := Vector3.ZERO
+var _body_shape: CollisionShape3D
+## The physics ragdoll once the soldier is down (null for the placeholder look).
+var _ragdoll: RagdollScript
 
 func _ready() -> void:
 	add_to_group(&"militia")
@@ -52,6 +63,7 @@ func _ready() -> void:
 	shape.shape = capsule
 	shape.position.y = 0.9
 	add_child(shape)
+	_body_shape = shape
 	_build_model()
 
 func _build_model() -> void:
@@ -119,9 +131,12 @@ func take_damage(amount: float, source: Node3D) -> void:
 	if state in [State.DOWNED, State.FED_ON, State.DEAD, State.GRABBED]:
 		return
 	health -= amount
-	_spawn_blood(global_position + Vector3.UP * 1.2, 0.5)
+	_spawn_blood(global_position, 0.3, 0.8)
 	if health <= 0:
-		_go_down()
+		# Thrown away from the claw; harder hits (rage) throw harder.
+		var away := _away_from(source)
+		var k := clampf(amount / 45.0, 1.0, 2.5)
+		_go_down(away * 1.0 * k + Vector3.UP * 0.4, away * 2.4 * k)
 	else:
 		_alert(source)
 		if GeneratedAssets.play(_anim, &"hit", 0.05, 1.3):
@@ -129,8 +144,15 @@ func take_damage(amount: float, source: Node3D) -> void:
 
 func take_pounce(source: Node3D) -> void:
 	if is_standing():
-		_spawn_blood(global_position + Vector3.UP * 1.0, 0.8)
-		_go_down()
+		_spawn_blood(global_position, 0.4, 1.0)
+		# Bowled over along the leap: chest driven ahead of it, legs swept out.
+		var away := _away_from(source)
+		if source is CharacterBody3D:
+			var leap := (source as CharacterBody3D).velocity
+			leap.y = 0.0
+			if leap.length() > 1.0:
+				away = leap.normalized()
+		_go_down(away * 1.8 + Vector3.UP * 0.4, away * 3.2)
 		_alert_nearby(source)
 
 func begin_feed(feeder: Node3D) -> void:
@@ -139,14 +161,31 @@ func begin_feed(feeder: Node3D) -> void:
 
 func finish_feed() -> void:
 	state = State.DEAD
-	_spawn_blood(global_position + Vector3.UP * 0.3, 1.4)
+	# Feeding opens the body up: a wide pool spreads out from under it.
+	_spawn_blood(global_position, 0.95, 2.5)
 	if _anim == null:
 		_model.scale = Vector3(1, 0.6, 1)
 
-func _go_down() -> void:
+## Flat direction from `source` to this soldier (forward if there is no source).
+func _away_from(source: Node3D) -> Vector3:
+	var away := -_model.global_basis.z
+	if is_instance_valid(source):
+		away = global_position - source.global_position
+	away.y = 0.0
+	return away.normalized() if away.length() > 0.01 else Vector3.FORWARD
+
+## Drops the soldier: a ragdoll thrown with `push` (all of it) and `upper_push`
+## (mostly chest and head, so it topples), or the old clip/tween without a rig.
+func _go_down(push := Vector3.ZERO, upper_push := Vector3.ZERO) -> void:
 	state = State.DOWNED
 	velocity = Vector3.ZERO
 	_muzzle_light.light_energy = 0.0
+	_ragdoll = RagdollScript.activate(_model, self, push, upper_push) as RagdollScript
+	if _ragdoll:
+		# The corpse is the ragdoll now; the standing capsule would block the player.
+		_body_shape.set_deferred(&"disabled", true)
+		_ragdoll.settled.connect(_on_body_settled)
+		return
 	if GeneratedAssets.play(_anim, &"down", 0.1):
 		return
 	var tw := create_tween()
@@ -176,6 +215,8 @@ func begin_grab(grabber: Node3D, pull_speed: float, arc_height: float, drop: flo
 	_grabber = grabber
 	_grab_from = global_position
 	_grab_t = 0.0
+	_grab_prev = _grab_from
+	_grab_velocity = Vector3.ZERO
 	_grab_arc = arc_height
 	_grab_drop = drop
 	_grab_time = maxf(_grab_from.distance_to(grabber.global_position) / pull_speed, 0.2)
@@ -204,6 +245,9 @@ func _process_grab(delta: float) -> void:
 	# Ease in so the yank snaps, with a hop over whatever is between them.
 	var t := 1.0 - pow(1.0 - _grab_t, 2.0)
 	global_position = _grab_from.lerp(to, t) + Vector3.UP * sin(t * PI) * _grab_arc
+	if delta > 0.0:
+		_grab_velocity = (global_position - _grab_prev) / delta
+	_grab_prev = global_position
 	var look := to - _grab_from
 	look.y = 0
 	if look.length() > 0.1:
@@ -214,8 +258,12 @@ func _process_grab(delta: float) -> void:
 func _end_grab() -> void:
 	collision_layer = _saved_layers.x
 	collision_mask = _saved_layers.y
-	_spawn_blood(global_position + Vector3.UP * 0.5, 0.9)
-	_go_down()
+	_spawn_blood(global_position, 0.4, 1.0)
+	# Slammed down where the yank ends: the legs carry on toward the volatile and the
+	# chest snaps back, so it lands on its back at the volatile's feet, not on them.
+	var travel := Vector3(_grab_velocity.x, 0.0, _grab_velocity.z).limit_length(4.0)
+	var dir := travel.normalized() if travel.length() > 0.1 else _away_from(_grabber) * -1.0
+	_go_down(travel * 0.25 + Vector3.DOWN * 1.5, -dir * 2.4)
 
 ## Scream: stunned on the spot, then panics and runs from `source`.
 func stun(source: Node3D, stun_time: float, panic_time: float, panic_speed: float) -> void:
@@ -266,24 +314,19 @@ func _alert_nearby(source: Node3D) -> void:
 		if other != self and other.state == State.PATROL and other.global_position.distance_to(global_position) < 18.0:
 			other._alert(source)
 
-func _spawn_blood(at: Vector3, size: float) -> void:
-	var pool := MeshInstance3D.new()
-	var disc := CylinderMesh.new()
-	disc.top_radius = size
-	disc.bottom_radius = size
-	disc.height = 0.01
-	pool.mesh = disc
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.0, 0.0)
-	mat.roughness = 0.05
-	mat.metallic_specular = 0.9
-	pool.material_override = mat
-	get_parent().add_child(pool)
-	pool.global_position = Vector3(at.x + randf_range(-0.3, 0.3), global_position.y + 0.02, at.z + randf_range(-0.3, 0.3))
+## Spreads a blood pool of `size` metres on the ground near `at`, over `grow` seconds.
+func _spawn_blood(at: Vector3, size: float, grow := 1.6) -> void:
+	var ground := Vector3(at.x + randf_range(-0.2, 0.2), global_position.y + 0.03, at.z + randf_range(-0.2, 0.2))
+	BloodPool.spawn(get_parent(), ground, size, grow)
 
 # --- Behaviour --------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	if _ragdoll:
+		# Down for good: the ragdoll moves the body, this node just tracks it.
+		if not _ragdoll.is_settled():
+			_follow_body()
+		return
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
 	match state:
@@ -373,6 +416,27 @@ func _combat(delta: float) -> void:
 	_muzzle_light.light_energy = 8.0
 	if randf() < hit_chance:
 		_player.take_damage(shot_damage)
+
+func _on_body_settled() -> void:
+	_follow_body()
+	reset_physics_interpolation()
+	# The body bleeds out where it came to rest.
+	_spawn_blood(_ragdoll.hips_position(), 0.7, 3.0)
+
+## Keeps this node on the floor under the ragdoll's hips, so the volatile's range
+## checks (feeding) find the body where it actually lies.
+func _follow_body() -> void:
+	var hips := _ragdoll.hips_position()
+	var q := PhysicsRayQueryParameters3D.create(hips + Vector3.UP * 0.2, hips + Vector3.DOWN * 2.5, 1)
+	# Only the street counts: not the volatile or a soldier standing over the body.
+	var skip: Array[RID] = []
+	for group: StringName in [&"player", &"militia"]:
+		for n in get_tree().get_nodes_in_group(group):
+			if n is CollisionObject3D:
+				skip.append((n as CollisionObject3D).get_rid())
+	q.exclude = skip
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	global_position = hit.position if not hit.is_empty() else hips + Vector3.DOWN * 0.15
 
 func _face(dir: Vector3) -> void:
 	_model.global_basis = Basis.looking_at(dir)
